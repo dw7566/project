@@ -1,10 +1,4 @@
-from src import datalocation as dl
-from src import runfile as rs
+from src.MZMfitting import main
 
-path = dl.fpath(r'.\data')
-save = 'T'
-show = 'F'
-csv_save = 'T'
-
-
-rs.runfile(path,save,show,csv_save)
+if __name__ == "__main__":
+    main()
