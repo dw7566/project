@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy.interpolate import PchipInterpolator
 from scipy.optimize import curve_fit
-from scipy.signal import find_peaks
+from scipy.signal import argrelextrema, find_peaks
 
 
 DATA_DIR = Path("data")
@@ -33,6 +33,11 @@ CSV_COLUMNS = [
     "current_at_plus_1v_a", "wavelength_start_nm", "wavelength_stop_nm",
     "point_count", "il_min_db", "il_max_db", "il_mean_db",
     "extinction_ratio_db", "wavelength_at_min_il_nm", "wavelength_at_max_il_nm",
+    "modulation_null_count", "modulation_fsr_nm",
+    "modulation_mean_abs_dlambda_dv_nm_per_v",
+    "modulation_mean_dlambda_dv_nm_per_v",
+    "modulation_dlambda_dv_by_null_nm_per_v",
+    "modulation_null_wavelengths_0v_nm", "modulation_r2_by_null",
     "source_file",
 ]
 
@@ -260,6 +265,152 @@ def sweep_label(sweep: dict[str, object], index: int, total: int) -> str:
     return f"Bias {bias}V"
 
 
+def csv_float(value: float, digits: int = 6) -> str:
+    if not np.isfinite(value):
+        return ""
+    return f"{value:.{digits}g}"
+
+
+def parse_modulation_sweeps(modulator: ET.Element) -> list[tuple[float, np.ndarray, np.ndarray]]:
+    sweeps = []
+    for sweep in modulator.findall("./PortCombo/WavelengthSweep"):
+        try:
+            bias = float(sweep.get("DCBias", "nan"))
+        except ValueError:
+            continue
+        wavelength = parse_float_array(sweep.findtext("./L"))
+        il = parse_float_array(sweep.findtext("./IL"))
+        count = min(wavelength.size, il.size)
+        if count == 0 or not np.isfinite(bias):
+            continue
+        wavelength = wavelength[:count]
+        il = il[:count]
+        order = np.argsort(wavelength)
+        sweeps.append((bias, wavelength[order], il[order]))
+    return sweeps
+
+
+def interpolate_sweeps(
+    sweeps: list[tuple[float, np.ndarray, np.ndarray]],
+) -> tuple[np.ndarray, np.ndarray, np.ndarray] | None:
+    by_bias: dict[float, tuple[np.ndarray, np.ndarray]] = {}
+    for bias, wavelength, il in sweeps:
+        by_bias.setdefault(bias, (wavelength, il))
+    if len(by_bias) < 2:
+        return None
+
+    items = sorted(by_bias.items())
+    low = max(float(wavelength[0]) for _, (wavelength, _) in items)
+    high = min(float(wavelength[-1]) for _, (wavelength, _) in items)
+    if not low < high:
+        return None
+
+    first_wavelength = items[0][1][0]
+    ref_wl = first_wavelength[(first_wavelength >= low) & (first_wavelength <= high)]
+    if ref_wl.size < 3:
+        return None
+
+    il_matrix = []
+    for _, (wavelength, il) in items:
+        il_matrix.append(np.interp(ref_wl, wavelength, il))
+    biases = np.asarray([bias for bias, _ in items], dtype=float)
+    return biases, ref_wl, np.asarray(il_matrix, dtype=float)
+
+
+def estimate_modulation_fsr(wavelength: np.ndarray, il: np.ndarray) -> float:
+    band_mask = (wavelength >= 1535.0) & (wavelength <= 1575.0)
+    if np.count_nonzero(band_mask) < 3:
+        span = float(wavelength[-1] - wavelength[0])
+        band_mask = ((wavelength >= wavelength[0] + 0.1 * span) &
+                     (wavelength <= wavelength[-1] - 0.1 * span))
+    maxima_idx = argrelextrema(il[band_mask], np.greater, order=40)[0]
+    wl_masked = wavelength[band_mask]
+    if maxima_idx.size < 2:
+        return float("nan")
+    spacing = np.diff(wl_masked[maxima_idx])
+    spacing = spacing[np.isfinite(spacing) & (spacing > 0)]
+    return float(np.mean(spacing)) if spacing.size else float("nan")
+
+
+def extract_modulation_efficiency(modulator: ET.Element) -> dict[str, object]:
+    empty = {
+        "modulation_null_count": 0,
+        "modulation_fsr_nm": "",
+        "modulation_mean_abs_dlambda_dv_nm_per_v": "",
+        "modulation_mean_dlambda_dv_nm_per_v": "",
+        "modulation_dlambda_dv_by_null_nm_per_v": "",
+        "modulation_null_wavelengths_0v_nm": "",
+        "modulation_r2_by_null": "",
+    }
+
+    interpolated = interpolate_sweeps(parse_modulation_sweeps(modulator))
+    if interpolated is None:
+        return empty
+    biases, wavelength, il_matrix = interpolated
+
+    null_tracks: dict[int, dict[float, float]] = {}
+    for index, bias in enumerate(biases):
+        minima_idx = argrelextrema(il_matrix[index], np.less, order=50)[0]
+        deep_minima = [idx for idx in minima_idx if il_matrix[index][idx] < -30.0]
+        for minimum_idx in deep_minima:
+            null_wavelength = float(wavelength[minimum_idx])
+            matched = False
+            for track in null_tracks.values():
+                if any(abs(null_wavelength - existing) < 2.0 for existing in track.values()):
+                    track[bias] = null_wavelength
+                    matched = True
+                    break
+            if not matched:
+                null_tracks[len(null_tracks)] = {bias: null_wavelength}
+
+    full_tracks = {
+        null_id: track
+        for null_id, track in null_tracks.items()
+        if len(track) == biases.size
+    }
+
+    track_results = []
+    for null_id, track in sorted(full_tracks.items()):
+        v_arr = np.asarray(sorted(track), dtype=float)
+        wl_arr = np.asarray([track[bias] for bias in v_arr], dtype=float)
+        if v_arr.size < 2:
+            continue
+        coeffs = np.polyfit(v_arr, wl_arr, 1)
+        wl_fit = np.polyval(coeffs, v_arr)
+        ss_res = float(np.sum((wl_arr - wl_fit) ** 2))
+        ss_tot = float(np.sum((wl_arr - np.mean(wl_arr)) ** 2))
+        r2 = 1.0 - ss_res / ss_tot if ss_tot > 0.0 else 0.0
+        track_results.append(
+            {
+                "null_id": null_id,
+                "dlambda_dv": float(coeffs[0]),
+                "wl_0v": float(np.polyval(coeffs, 0.0)),
+                "r2": r2,
+            }
+        )
+
+    if not track_results:
+        return empty
+
+    dlambda_values = np.asarray([item["dlambda_dv"] for item in track_results], dtype=float)
+    fsr = estimate_modulation_fsr(wavelength, il_matrix[0])
+    return {
+        "modulation_null_count": len(track_results),
+        "modulation_fsr_nm": csv_float(fsr),
+        "modulation_mean_abs_dlambda_dv_nm_per_v": csv_float(float(np.mean(np.abs(dlambda_values)))),
+        "modulation_mean_dlambda_dv_nm_per_v": csv_float(float(np.mean(dlambda_values))),
+        "modulation_dlambda_dv_by_null_nm_per_v": ";".join(
+            f"{item['dlambda_dv']:.6f}" for item in track_results
+        ),
+        "modulation_null_wavelengths_0v_nm": ";".join(
+            f"{item['wl_0v']:.4f}" for item in track_results
+        ),
+        "modulation_r2_by_null": ";".join(
+            f"{item['r2']:.6f}" for item in track_results
+        ),
+    }
+
+
 def summarize_xml(xml_path: Path) -> list[dict[str, object]]:
     root = ET.parse(xml_path).getroot()
     test_site_info = root.find("./TestSiteInfo")
@@ -290,6 +441,7 @@ def summarize_xml(xml_path: Path) -> list[dict[str, object]]:
         current_minus_1v = nearest_value(voltage, current, -1.0)
         current_0v = nearest_value(voltage, current, 0.0)
         current_plus_1v = nearest_value(voltage, current, 1.0)
+        modulation = extract_modulation_efficiency(modulator)
 
         for sweep in modulator.findall("./PortCombo/WavelengthSweep"):
             wavelength = parse_float_list(sweep.findtext("./L"))
@@ -321,6 +473,7 @@ def summarize_xml(xml_path: Path) -> list[dict[str, object]]:
                     "extinction_ratio_db": il_max - il_min,
                     "wavelength_at_min_il_nm": wavelength[min_index],
                     "wavelength_at_max_il_nm": wavelength[max_index],
+                    **modulation,
                     "source_file": str(xml_path),
                 }
             )
