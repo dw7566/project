@@ -20,6 +20,7 @@ DATA_DIR = Path("data")
 CSV_DIR = Path("res") / "csv"
 PNG_DIR = Path("res") / "png"
 MODULATION_EFFICIENCY_PNG_DIR = "07_wavelength_modulation_efficiency"
+EXTINCTION_RATIO_PNG_DIR = "08_extinction_ratio"
 
 THERMAL_VOLTAGE = 0.02585
 MOD_BIAS = "-1.0"
@@ -889,6 +890,39 @@ def analyze_modulation_efficiency_figure(xml_path: Path, root: ET.Element | None
     return True
 
 
+def extinction_ratio_png_path(xml_path: Path, root: ET.Element) -> Path:
+    test_site_info = root.find("./TestSiteInfo")
+    batch = attr_any(test_site_info, "Batch", default=xml_path.parents[2].name)
+    wafer = attr_any(test_site_info, "Wafer", default=xml_path.parent.parent.name)
+    timestamp = xml_path.parent.name
+    return PNG_DIR / EXTINCTION_RATIO_PNG_DIR / batch / wafer / timestamp / f"{xml_path.stem}.png"
+
+
+def analyze_extinction_ratio_figure(xml_path: Path, root: ET.Element | None = None) -> bool:
+    if root is None:
+        root = ET.parse(xml_path).getroot()
+
+    out_path = extinction_ratio_png_path(xml_path, root)
+    fig, axes = plt.subplots(1, 3, figsize=(18, 6))
+    fig.subplots_adjust(left=0.055, right=0.985, bottom=0.16, top=0.80, wspace=0.32)
+    plot_extinction_ratio_panels(axes, root)
+
+    test_site_info = root.find("./TestSiteInfo")
+    batch = attr_any(test_site_info, "Batch", default="?")
+    wafer = attr_any(test_site_info, "Wafer", default="?")
+    device = attr_any(test_site_info, "TestSite", default="?")
+    die = f"({attr_any(test_site_info, 'DieColumn', default='?')},{attr_any(test_site_info, 'DieRow', default='?')})"
+    fig.suptitle(f"Extinction Ratio Analysis for {wafer} {die} {device}",
+                 fontsize=14, fontweight="bold", y=0.97)
+    fig.text(0.5, 0.91, f"Batch: {batch}  |  Date: {root.attrib.get('CreationDate', '?')}",
+             ha="center", fontsize=10, color="dimgray")
+
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(out_path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    return True
+
+
 def analyze_figure(xml_path: Path, out_path: Path) -> bool:
     root, sweeps, iv = load_xml(xml_path)
     if not sweeps:
@@ -1115,6 +1149,7 @@ def analyze_mzm(data_dir: Path = DATA_DIR) -> list[dict[str, object]]:
             output_path = unique_png_path(wafer, timestamp, xml_path, used_png_names_by_folder)
             analyze_figure(xml_path, output_path)
             analyze_modulation_efficiency_figure(xml_path, root)
+            analyze_extinction_ratio_figure(xml_path, root)
         except Exception as exc:
             print(f"\n  ERROR {xml_path}: {exc}", flush=True)
     print(flush=True)
