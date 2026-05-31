@@ -332,21 +332,26 @@ def estimate_modulation_fsr(wavelength: np.ndarray, il: np.ndarray) -> float:
     return float(np.mean(spacing)) if spacing.size else float("nan")
 
 
-def extract_modulation_efficiency(modulator: ET.Element) -> dict[str, object]:
-    empty = {
-        "modulation_null_count": 0,
-        "modulation_fsr_nm": "",
-        "modulation_mean_abs_dlambda_dv_nm_per_v": "",
-        "modulation_mean_dlambda_dv_nm_per_v": "",
-        "modulation_dlambda_dv_by_null_nm_per_v": "",
-        "modulation_null_wavelengths_0v_nm": "",
-        "modulation_r2_by_null": "",
+def empty_modulation_analysis() -> dict[str, object]:
+    return {
+        "biases": np.array([], dtype=float),
+        "wavelength": np.array([], dtype=float),
+        "il_matrix": np.empty((0, 0), dtype=float),
+        "track_results": [],
+        "fsr_nm": float("nan"),
+        "mean_abs_dlambda_dv": float("nan"),
+        "mean_dlambda_dv": float("nan"),
     }
+
+
+def analyze_modulation_efficiency(modulator: ET.Element) -> dict[str, object]:
+    result = empty_modulation_analysis()
 
     interpolated = interpolate_sweeps(parse_modulation_sweeps(modulator))
     if interpolated is None:
-        return empty
+        return result
     biases, wavelength, il_matrix = interpolated
+    result.update({"biases": biases, "wavelength": wavelength, "il_matrix": il_matrix})
 
     null_tracks: dict[int, dict[float, float]] = {}
     for index, bias in enumerate(biases):
@@ -383,6 +388,9 @@ def extract_modulation_efficiency(modulator: ET.Element) -> dict[str, object]:
         track_results.append(
             {
                 "null_id": null_id,
+                "v": v_arr,
+                "wl": wl_arr,
+                "coeffs": coeffs,
                 "dlambda_dv": float(coeffs[0]),
                 "wl_0v": float(np.polyval(coeffs, 0.0)),
                 "r2": r2,
@@ -390,15 +398,42 @@ def extract_modulation_efficiency(modulator: ET.Element) -> dict[str, object]:
         )
 
     if not track_results:
-        return empty
+        return result
 
     dlambda_values = np.asarray([item["dlambda_dv"] for item in track_results], dtype=float)
     fsr = estimate_modulation_fsr(wavelength, il_matrix[0])
+    result.update(
+        {
+            "track_results": track_results,
+            "fsr_nm": fsr,
+            "mean_abs_dlambda_dv": float(np.mean(np.abs(dlambda_values))),
+            "mean_dlambda_dv": float(np.mean(dlambda_values)),
+        }
+    )
+    return result
+
+
+def extract_modulation_efficiency(modulator: ET.Element) -> dict[str, object]:
+    empty = {
+        "modulation_null_count": 0,
+        "modulation_fsr_nm": "",
+        "modulation_mean_abs_dlambda_dv_nm_per_v": "",
+        "modulation_mean_dlambda_dv_nm_per_v": "",
+        "modulation_dlambda_dv_by_null_nm_per_v": "",
+        "modulation_null_wavelengths_0v_nm": "",
+        "modulation_r2_by_null": "",
+    }
+
+    analysis = analyze_modulation_efficiency(modulator)
+    track_results = analysis["track_results"]
+    if not track_results:
+        return empty
+
     return {
         "modulation_null_count": len(track_results),
-        "modulation_fsr_nm": csv_float(fsr),
-        "modulation_mean_abs_dlambda_dv_nm_per_v": csv_float(float(np.mean(np.abs(dlambda_values)))),
-        "modulation_mean_dlambda_dv_nm_per_v": csv_float(float(np.mean(dlambda_values))),
+        "modulation_fsr_nm": csv_float(float(analysis["fsr_nm"])),
+        "modulation_mean_abs_dlambda_dv_nm_per_v": csv_float(float(analysis["mean_abs_dlambda_dv"])),
+        "modulation_mean_dlambda_dv_nm_per_v": csv_float(float(analysis["mean_dlambda_dv"])),
         "modulation_dlambda_dv_by_null_nm_per_v": ";".join(
             f"{item['dlambda_dv']:.6f}" for item in track_results
         ),
@@ -594,6 +629,93 @@ def unique_png_path(wafer: str, timestamp: str, xml_path: Path,
         index += 1
 
 
+def plot_modulation_efficiency_panels(axes, root: ET.Element) -> None:
+    ax_shift, ax_bar, ax_summary = axes
+    modulators = find_mzm_modulators(root)
+    if not modulators:
+        for ax in axes:
+            ax.set_axis_off()
+        ax_summary.text(0.5, 0.5, "Wavelength modulation\nMZM modulator not found",
+                        transform=ax_summary.transAxes, ha="center", va="center",
+                        color="red")
+        return
+
+    analysis = analyze_modulation_efficiency(modulators[0])
+    track_results = analysis["track_results"]
+    if not track_results:
+        for ax in axes:
+            ax.set_axis_off()
+        ax_summary.text(0.5, 0.5, "Wavelength modulation\nNo full deep-null tracks",
+                        transform=ax_summary.transAxes, ha="center", va="center",
+                        color="red")
+        return
+
+    markers = ["o", "s", "D", "^", "v", "P", "X", "*"]
+    for index, track in enumerate(track_results):
+        v_arr = track["v"]
+        wl_arr = track["wl"]
+        coeffs = track["coeffs"]
+        marker = markers[index % len(markers)]
+        ax_shift.scatter(v_arr, wl_arr, s=45, marker=marker, zorder=5,
+                         label=f"Null @{float(track['wl_0v']):.1f} nm")
+        v_fine = np.linspace(float(np.min(v_arr)) - 0.3, float(np.max(v_arr)) + 0.3, 80)
+        ax_shift.plot(v_fine, np.polyval(coeffs, v_fine), "--", linewidth=1.2)
+
+    ax_shift.set_title("Null wavelength vs voltage")
+    ax_shift.set_xlabel("DC bias [V]")
+    ax_shift.set_ylabel("Null wavelength [nm]")
+    ax_shift.legend(fontsize="x-small", loc="best")
+    ax_shift.grid(True, ls="--", alpha=0.35)
+
+    labels = [f"@{float(track['wl_0v']):.0f}nm" for track in track_results]
+    dlambda_values = [float(track["dlambda_dv"]) for track in track_results]
+    positions = np.arange(len(dlambda_values))
+    bar_colors = ["steelblue" if value < 0 else "coral" for value in dlambda_values]
+    bars = ax_bar.bar(positions, dlambda_values, color=bar_colors,
+                      edgecolor="black", alpha=0.85)
+    for bar, value in zip(bars, dlambda_values):
+        va = "bottom" if value >= 0 else "top"
+        offset = 0.003 if value >= 0 else -0.003
+        ax_bar.text(bar.get_x() + bar.get_width() / 2, value + offset,
+                    f"{value:.4f}", ha="center", va=va, fontsize=8)
+    ax_bar.axhline(0.0, color="gray", linewidth=0.8)
+    ax_bar.set_xticks(positions)
+    ax_bar.set_xticklabels(labels, rotation=25, ha="right")
+    ax_bar.set_title("Wavelength modulation efficiency")
+    ax_bar.set_xlabel("Null position")
+    ax_bar.set_ylabel("dLambda/dV [nm/V]")
+    ax_bar.grid(True, axis="y", ls="--", alpha=0.35)
+
+    def _fmt(value: object, spec: str) -> str:
+        try:
+            numeric = float(value)
+        except (TypeError, ValueError):
+            return "n/a"
+        return format(numeric, spec) if np.isfinite(numeric) else "n/a"
+
+    summary = [
+        "Wavelength modulation efficiency",
+        f"Deep-null tracks: {len(track_results)}",
+        f"FSR: {_fmt(analysis['fsr_nm'], '.3f')} nm",
+        f"Mean |dLambda/dV|: {_fmt(analysis['mean_abs_dlambda_dv'], '.4f')} nm/V",
+        f"Mean dLambda/dV: {_fmt(analysis['mean_dlambda_dv'], '.4f')} nm/V",
+        "",
+        "Per null:",
+    ]
+    for track in track_results:
+        summary.append(
+            f"@{float(track['wl_0v']):7.2f} nm  "
+            f"{float(track['dlambda_dv']): .4f} nm/V  "
+            f"R2={float(track['r2']):.4f}"
+        )
+
+    ax_summary.set_axis_off()
+    ax_summary.text(0.03, 0.97, "\n".join(summary), transform=ax_summary.transAxes,
+                    va="top", ha="left", fontsize=9, family="monospace",
+                    bbox=dict(boxstyle="round,pad=0.45", fc="lightyellow",
+                              ec="0.5", lw=0.8, alpha=0.95))
+
+
 def analyze_figure(xml_path: Path, out_path: Path) -> bool:
     root, sweeps, iv = load_xml(xml_path)
     if not sweeps:
@@ -607,8 +729,8 @@ def analyze_figure(xml_path: Path, out_path: Path) -> bool:
     poly_func = np.poly1d(np.polyfit(ref_l, ref_il, 3))
     fsr_fallback = device_fsr_fallback(root)
 
-    fig, axes = plt.subplots(2, 3, figsize=(20, 11))
-    plt.subplots_adjust(hspace=0.35, wspace=0.3)
+    fig, axes = plt.subplots(3, 3, figsize=(20, 15))
+    plt.subplots_adjust(hspace=0.45, wspace=0.3)
 
     ax1 = axes[0, 0]
     for index, sweep in enumerate(sweeps):
@@ -787,6 +909,8 @@ def analyze_figure(xml_path: Path, out_path: Path) -> bool:
     ax6.set_ylabel("Current [A]")
     ax6.grid(True, which="both", ls="--", alpha=0.5)
     ax6.legend(fontsize="small", loc="lower left")
+
+    plot_modulation_efficiency_panels(axes[2, :], root)
 
     test_site_info = root.find(".//TestSiteInfo")
     batch = attr_any(test_site_info, "Batch", default="?")
