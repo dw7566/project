@@ -1,7 +1,7 @@
 ![header](https://capsule-render.vercel.app/api?type=wave&color=auto&height=200&section=header&text=SPDAP&fontSize=70)
 
 ###### Silicon Photonics Data Analysis Automation Pipeline
-### :pencil:Contents
+### Contents
 
 [1. Introduction](#1-introduction)\
 [2. Project information](#2-project-information)\
@@ -11,7 +11,7 @@
 ---
 
 # SPDAP :
-##### Hi :wave:
+##### Hi !
 ##### Thank you for looking at our project. SPDAP stands for "Silicon Photonics Data Analysis Automation Pipeline."
 ##### This project automates silicon photonics wafer-scale measurement analysis and generates organized CSV and PNG results.
 
@@ -23,11 +23,11 @@ The goal is to process wafer-scale XML measurement data, extract MZM-related dev
 
 #### - contributors : If you have any questions, please contact us at the following email.
 
-|     name      |          E-mail          |
-|:-------------:|:------------------------:|
-| Kim dong min  |   dm1656@hanyang.ac.kr   |
-| Kim sang wook | tkdlek850@hanyang.ac.kr  |
-| Lee jae hyeok |                          |
+|     name      |         E-mail          |
+|:-------------:|:-----------------------:|
+| Kim dong min  |  dm1656@hanyang.ac.kr   |
+| Kim sang wook | tkdlek850@hanyang.ac.kr |
+| Lee jae hyeok |  dw7566@hanyang.ac.kr   |
 
 
 ---
