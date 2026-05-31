@@ -96,9 +96,3 @@ python run.py
 * Next
    + `src/MZMfitting.py` searches for MZM XML files, creates analysis figures, and writes wafer-level and timestamp-level CSV summaries.
 ---
-
-### :warning:precautions
-
- 1) Raw XML files should follow the existing wafer/timestamp folder structure under `data`.
- 2) Files without valid MZM wavelength sweep data can be skipped during analysis.
- 3) Existing result files under the old flat output layout may be cleaned before new SPDAP outputs are written.
