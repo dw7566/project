@@ -5,7 +5,7 @@
 
 [1. Introduction](#1-introduction)\
 [2. Project information](#2-project-information)\
-[3. Install and Run](#3-install-and-run)\
+[3. Run](#3-install-and-run)\
 [4. Description of the module file feature](#4-description-of-the-module-file-feature)
 
 ---
@@ -18,9 +18,8 @@
 ---
 
 ## 1. Introduction
-#### - SPDAP : Silicon Photonics Data Analysis Automation Pipeline
 We aim to develop a Python-based automation pipeline for silicon photonics data analysis.
-The goal is to process wafer-scale XML measurement data, extract MZM-related device information, fit key optical/electrical characteristics, and save reusable analysis outputs.
+The goal is to process wafer-scale XML measurement data, extract MZM-related device information, key optical/electrical characteristics, and save analysis outputs.
 
 #### - contributors : If you have any questions, please contact us at the following email.
 
@@ -37,15 +36,13 @@ The goal is to process wafer-scale XML measurement data, extract MZM-related dev
  ####
  + **Detailed project**
 
-     The main task is to analyze silicon photonics measurement data collected from wafer-scale experiments.
+
      Main analysis targets
      + Wafer
      + Die row & column
      + MZM XML measurement files
      + Optical spectrum and IV characteristics
 
-   SPDAP automatically searches the selected data directory, extracts MZM-related XML files, analyzes each measurement, and stores summary results by wafer and measurement timestamp.
-   This pipeline reduces repetitive manual plotting and CSV generation work during silicon photonics device characterization.
 
  ####
 + **Run file description**
