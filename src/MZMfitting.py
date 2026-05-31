@@ -151,16 +151,6 @@ def measure_fsr(wavelength: np.ndarray, transmission_db: np.ndarray, fallback: f
 
 
 def crest_points(wavelength: np.ndarray, values_db: np.ndarray, fsr: float) -> tuple[np.ndarray, np.ndarray]:
-    """Locate the fringe crests (transmission maxima) the envelope should pass through.
-
-    Three guards keep only genuine crests:
-      * ``prominence`` (scaled to fringe depth) rejects shallow bumps -- e.g. the
-        small upturn where a band edge falls mid-notch, which is otherwise picked
-        up as a spurious low "crest" near 1580 nm and drags the envelope down,
-        pushing the real crest near it several dB above 0.
-      * band-edge anchors recover crests that ``find_peaks`` drops at the very ends.
-      * a robust pass removes any candidate sitting well below the crest trend.
-    """
     step = float(np.median(np.diff(wavelength))) if wavelength.size > 2 else 0.01
     distance = max(1, int(round(0.6 * fsr / max(abs(step), 1e-6))))
     span = float(np.percentile(values_db, 95) - np.percentile(values_db, 5))
@@ -181,7 +171,6 @@ def crest_points(wavelength: np.ndarray, values_db: np.ndarray, fsr: float) -> t
     xs_arr, ys_arr = xs_arr[order], ys_arr[order]
     _, unique_idx = np.unique(np.round(xs_arr, 3), return_index=True)
     xs_arr, ys_arr = xs_arr[unique_idx], ys_arr[unique_idx]
-    # robust rejection: drop crests > 2.5 dB below the linear crest trend
     for _ in range(4):
         if xs_arr.size < 4:
             break
@@ -194,22 +183,12 @@ def crest_points(wavelength: np.ndarray, values_db: np.ndarray, fsr: float) -> t
 
 
 def top_envelope(wavelength: np.ndarray, values_db: np.ndarray, fsr: float, degree: int = 2) -> np.ndarray:
-    """Upper (peak) envelope: monotone PCHIP interpolation through the detected
-    fringe crests, with the ends held flat so there is no runaway extrapolation.
-
-    A global polynomial cannot follow an asymmetric crest trend (it is forced
-    symmetric), so the crest at one band edge floats above 0 after subtraction.
-    A PCHIP curve passes exactly through every crest and does not overshoot
-    between them, so all crests land on the 0 dB baseline. Falls back to a
-    polynomial only when too few crests are found for interpolation.
-    """
     xs, ys = crest_points(wavelength, values_db, fsr)
     if xs.size >= 2:
         envelope = PchipInterpolator(xs, ys, extrapolate=True)(wavelength)
         envelope[wavelength < xs[0]] = ys[0]
         envelope[wavelength > xs[-1]] = ys[-1]
         return envelope
-    # fallback: one window per FSR so each window max is a genuine crest
     n_windows = int(np.clip(round((wavelength.max() - wavelength.min()) / fsr), 3, 12))
     edges = np.linspace(float(wavelength.min()), float(wavelength.max()), n_windows + 1)
     xs_l: list[float] = []
@@ -228,15 +207,6 @@ def top_envelope(wavelength: np.ndarray, values_db: np.ndarray, fsr: float, degr
 
 def flatten_to_envelope(wavelength: np.ndarray, values_db: np.ndarray,
                         fsr: float | None = None, degree: int = 2) -> np.ndarray:
-    """Second-stage flattening: subtract the residual device envelope so the
-    fringe maxima land on the 0 dB baseline.
-
-    Reference subtraction (IL - cubic_fit(reference)) only removes the *reference*
-    waveguide envelope. Devices whose grating-coupler / insertion-loss envelope
-    differs from the reference port -- notably the O-band LMZO devices -- keep a
-    dome-shaped residual after step 1, so their fringe peaks droop several dB at
-    the band edges instead of sitting flat at 0 dB. This step removes that dome.
-    """
     if wavelength.size < 4:
         return values_db
     band = float(wavelength.max() - wavelength.min())
@@ -447,6 +417,176 @@ def extract_modulation_efficiency(modulator: ET.Element) -> dict[str, object]:
     }
 
 
+# =====================================================================
+# 소광비 (Extinction Ratio) 분석
+# =====================================================================
+
+def analyze_extinction_ratio(modulator: ET.Element) -> dict[str, object]:
+    """Deep null 기반 소광비(ER) 추출. ER < 10 dB인 가짜 null은 제외."""
+    empty: dict[str, object] = {
+        "er_results": [],
+        "biases": np.array([], dtype=float),
+    }
+
+    interpolated = interpolate_sweeps(parse_modulation_sweeps(modulator))
+    if interpolated is None:
+        return empty
+    biases, wavelength, il_matrix = interpolated
+
+    MIN_ER_DB = 10
+    order = 40
+    er_results: list[dict[str, object]] = []
+
+    for i, bias in enumerate(biases):
+        il = il_matrix[i]
+        maxima_idx = argrelextrema(il, np.greater, order=order)[0]
+        minima_idx = argrelextrema(il, np.less, order=order)[0]
+
+        er_list: list[float] = []
+        pair_info: list[dict[str, float]] = []
+
+        for mi in minima_idx:
+            null_wl = float(wavelength[mi])
+            null_il = float(il[mi])
+
+            left_peaks = maxima_idx[maxima_idx < mi]
+            right_peaks = maxima_idx[maxima_idx > mi]
+
+            if len(left_peaks) > 0 and len(right_peaks) > 0:
+                lp = left_peaks[-1]
+                rp = right_peaks[0]
+                peak_idx = lp if il[lp] >= il[rp] else rp
+                peak_wl = float(wavelength[peak_idx])
+                peak_il = float(il[peak_idx])
+                er = peak_il - null_il
+
+                if er < MIN_ER_DB:
+                    continue
+
+                er_list.append(er)
+                pair_info.append({
+                    "null_wl": null_wl, "null_il": null_il,
+                    "peak_wl": peak_wl, "peak_il": peak_il,
+                    "er": er,
+                })
+
+        er_results.append({
+            "bias": float(bias),
+            "er_list": er_list,
+            "er_mean": float(np.mean(er_list)) if er_list else 0.0,
+            "er_max": float(np.max(er_list)) if er_list else 0.0,
+            "er_min": float(np.min(er_list)) if er_list else 0.0,
+            "pairs": pair_info,
+        })
+
+    return {"er_results": er_results, "biases": biases}
+
+
+def plot_extinction_ratio_panels(axes, root: ET.Element) -> None:
+    """Row 3 패널: ER vs Bias, ER by Fringe, ER 요약 텍스트."""
+    ax_bias, ax_fringe, ax_summary = axes
+
+    modulators = find_mzm_modulators(root)
+    if not modulators:
+        for ax in axes:
+            ax.set_axis_off()
+        ax_summary.text(0.5, 0.5, "Extinction ratio\nMZM modulator not found",
+                        transform=ax_summary.transAxes, ha="center", va="center",
+                        color="red")
+        return
+
+    analysis = analyze_extinction_ratio(modulators[0])
+    er_results = analysis["er_results"]
+    biases = analysis["biases"]
+
+    if not er_results or all(len(r["er_list"]) == 0 for r in er_results):
+        for ax in axes:
+            ax.set_axis_off()
+        ax_summary.text(0.5, 0.5, "Extinction ratio\nNo valid fringes found",
+                        transform=ax_summary.transAxes, ha="center", va="center",
+                        color="red")
+        return
+
+    # ── (3,0) ER vs DC Bias ──
+    bias_arr = np.array([r["bias"] for r in er_results])
+    er_means = [r["er_mean"] for r in er_results]
+    er_maxs = [r["er_max"] for r in er_results]
+    er_mins = [r["er_min"] for r in er_results]
+
+    ax_bias.fill_between(bias_arr, er_mins, er_maxs, alpha=0.2,
+                         color="steelblue", label="Min\u2013Max range")
+    ax_bias.plot(bias_arr, er_means, "bo-", ms=7, lw=2, label="Mean ER")
+    ax_bias.plot(bias_arr, er_maxs, "g^--", ms=5, lw=1, alpha=0.7, label="Max ER")
+    ax_bias.plot(bias_arr, er_mins, "rv--", ms=5, lw=1, alpha=0.7, label="Min ER")
+    for b, m in zip(bias_arr, er_means):
+        ax_bias.annotate(f"{m:.1f}", (b, m), textcoords="offset points",
+                         xytext=(0, 10), ha="center", fontsize=8)
+    ax_bias.set_title("ER vs DC bias")
+    ax_bias.set_xlabel("DC bias [V]")
+    ax_bias.set_ylabel("Extinction ratio [dB]")
+    ax_bias.legend(fontsize="x-small", loc="best")
+    ax_bias.grid(True, ls="--", alpha=0.35)
+
+    # ── (3,1) ER by Fringe Position (@ 0V) ──
+    idx_0v = int(np.argmin(np.abs(bias_arr - 0.0)))
+    res_0v = er_results[idx_0v]
+
+    if res_0v["pairs"]:
+        labels = [f"@{p['null_wl']:.0f}nm" for p in res_0v["pairs"]]
+        er_vals = [p["er"] for p in res_0v["pairs"]]
+        positions = np.arange(len(er_vals))
+        bar_colors = plt.cm.viridis(np.linspace(0.3, 0.9, len(er_vals)))
+        bars = ax_fringe.bar(positions, er_vals, color=bar_colors,
+                             edgecolor="black", alpha=0.85)
+        for bar, val in zip(bars, er_vals):
+            ax_fringe.text(bar.get_x() + bar.get_width() / 2,
+                           bar.get_height() + 0.3, f"{val:.1f}",
+                           ha="center", va="bottom", fontsize=8)
+        ax_fringe.axhline(np.mean(er_vals), color="red", ls="--", lw=1,
+                          label=f"Mean={np.mean(er_vals):.1f} dB")
+        ax_fringe.set_xticks(positions)
+        ax_fringe.set_xticklabels(labels, rotation=25, ha="right", fontsize=8)
+    ax_fringe.set_title("ER by fringe position (@ 0 V)")
+    ax_fringe.set_xlabel("Null position")
+    ax_fringe.set_ylabel("Extinction ratio [dB]")
+    ax_fringe.legend(fontsize="x-small")
+    ax_fringe.grid(True, axis="y", ls="--", alpha=0.35)
+
+    # ── (3,2) ER 요약 텍스트 ──
+    def _fmt(value: float, spec: str) -> str:
+        return format(value, spec) if np.isfinite(value) else "n/a"
+
+    summary_lines = [
+        "Extinction ratio analysis",
+        "",
+        "Per bias:",
+    ]
+    for r in er_results:
+        n = len(r["er_list"])
+        summary_lines.append(
+            f"  V={r['bias']:+5.1f}V  ER={_fmt(r['er_mean'], '.1f'):>6s} dB"
+            f"  ({n} fringes)"
+        )
+    summary_lines += [
+        "",
+        "Overall:",
+        f"  ER range: {_fmt(min(er_mins), '.1f')} ~ {_fmt(max(er_maxs), '.1f')} dB",
+        f"  Best ER:  {_fmt(max(er_maxs), '.1f')} dB",
+        f"  Bias range: {bias_arr[0]:.1f} ~ {bias_arr[-1]:.1f} V",
+        f"  Fringe count (0 V): {len(res_0v['pairs'])}",
+    ]
+
+    ax_summary.set_axis_off()
+    ax_summary.text(0.03, 0.97, "\n".join(summary_lines),
+                    transform=ax_summary.transAxes, va="top", ha="left",
+                    fontsize=9, family="monospace",
+                    bbox=dict(boxstyle="round,pad=0.45", fc="lightyellow",
+                              ec="0.5", lw=0.8, alpha=0.95))
+
+
+# =====================================================================
+
+
 def summarize_xml(xml_path: Path) -> list[dict[str, object]]:
     root = ET.parse(xml_path).getroot()
     test_site_info = root.find("./TestSiteInfo")
@@ -581,7 +721,6 @@ def plot_wafer_summary(wafer: str, rows: list[dict[str, object]], path: Path) ->
 
 
 def clean_legacy_outputs() -> None:
-    """Remove files from the old flat output layout before writing the dated layout."""
     if PNG_DIR.exists():
         for wafer_dir in PNG_DIR.iterdir():
             if not wafer_dir.is_dir():
@@ -763,7 +902,8 @@ def analyze_figure(xml_path: Path, out_path: Path) -> bool:
     poly_func = np.poly1d(np.polyfit(ref_l, ref_il, 3))
     fsr_fallback = device_fsr_fallback(root)
 
-    fig, axes = plt.subplots(3, 3, figsize=(20, 15))
+    # ── 4x3 레이아웃 (Row 3 = 소광비) ──
+    fig, axes = plt.subplots(4, 3, figsize=(20, 20))
     plt.subplots_adjust(hspace=0.45, wspace=0.3)
 
     ax1 = axes[0, 0]
@@ -797,11 +937,6 @@ def analyze_figure(xml_path: Path, out_path: Path) -> bool:
         assert isinstance(wavelength, np.ndarray)
         assert isinstance(il, np.ndarray)
         processed = il - poly_func(wavelength)
-        # The reference sweep has no fringes; cubic subtraction already flattens
-        # it to ~0 dB. Running the second-stage (peak-envelope) flatten on it would
-        # subtract its noise ceiling and push the whole reference ~1 dB below 0,
-        # making the modulator crests appear to rise ABOVE the reference (which is
-        # physically impossible). So flatten only the modulator sweeps.
         is_reference = index == len(sweeps) - 1
         if is_reference:
             flattened = processed
@@ -826,8 +961,6 @@ def analyze_figure(xml_path: Path, out_path: Path) -> bool:
         assert isinstance(il, np.ndarray)
         proc_db = il - poly_func(wavelength)
         fsr0 = measure_fsr(wavelength, proc_db, fallback=fsr_fallback)
-        # apply the same second-stage flatten before converting to linear scale,
-        # so the cos^2 model is not fighting a residual dome (raises LMZO R^2)
         proc_db = flatten_to_envelope(wavelength, proc_db, fsr0)
         transmission = 10 ** (proc_db / 10.0)
 
@@ -887,32 +1020,28 @@ def analyze_figure(xml_path: Path, out_path: Path) -> bool:
         ax6.semilogy(voltage[positive], current_abs[positive], "o",
                      color="tab:blue", ms=5, label="Measured IV")
 
-        # --- reverse / low-bias region: polynomial fit on log10(|I|) ---
         reverse = (voltage < 0.5) & positive
         r2_rev = float("nan")
         if np.count_nonzero(reverse) >= 4:
             v_rev_pts = voltage[reverse]
             log_i_rev = np.log10(current_abs[reverse])
-            # drop sharp single-point notches (diode zero-crossing, where |I| collapses
-            # to the noise floor) so the polynomial doesn't oscillate toward that dip
             keep = np.ones(v_rev_pts.size, dtype=bool)
             for i in range(1, v_rev_pts.size - 1):
                 if log_i_rev[i] < 0.5 * (log_i_rev[i - 1] + log_i_rev[i + 1]) - 1.0:
                     keep[i] = False
             v_keep, log_keep = v_rev_pts[keep], log_i_rev[keep]
-            deg = min(4, v_keep.size - 1)  # cap degree -> smooth, no Runge wiggle
+            deg = min(4, v_keep.size - 1)
             rev_poly = np.poly1d(np.polyfit(v_keep, log_keep, deg))
             v_rev = np.linspace(float(v_keep.min()), float(v_keep.max()), 200)
             ax6.semilogy(v_rev, 10 ** rev_poly(v_rev), "-", color="tab:orange",
                          label="Reverse polynomial fit")
             r2_rev = r2_score(log_keep, rev_poly(v_keep))
 
-        # --- forward region: diode fit only if the device actually turns on ---
         forward = (voltage >= 0.5) & positive
         diode_is = diode_n = r2_fwd = float("nan")
         turn_on = (np.count_nonzero(forward) >= 2 and
                    (np.log10(current_abs[forward].max()) -
-                    np.log10(current_abs[forward].min())) > 1.0)  # >= ~1 decade rise
+                    np.log10(current_abs[forward].min())) > 1.0)
         if turn_on:
             try:
                 popt, _ = curve_fit(
@@ -928,7 +1057,6 @@ def analyze_figure(xml_path: Path, out_path: Path) -> bool:
                 ax6.text(0.5, 0.2, f"Diode fit failed\n{exc}", transform=ax6.transAxes,
                          ha="center", color="red", fontsize="small")
 
-        # --- stats box (n/a when the diode fit is skipped) ---
         def _fmt(value, spec):
             return "n/a" if not np.isfinite(value) else format(value, spec)
 
@@ -944,7 +1072,11 @@ def analyze_figure(xml_path: Path, out_path: Path) -> bool:
     ax6.grid(True, which="both", ls="--", alpha=0.5)
     ax6.legend(fontsize="small", loc="lower left")
 
+    # Row 2: 변조효율
     plot_modulation_efficiency_panels(axes[2, :], root)
+
+    # Row 3: 소광비
+    plot_extinction_ratio_panels(axes[3, :], root)
 
     test_site_info = root.find(".//TestSiteInfo")
     batch = attr_any(test_site_info, "Batch", default="?")
@@ -954,7 +1086,7 @@ def analyze_figure(xml_path: Path, out_path: Path) -> bool:
     title = f"Analysis for {wafer} {die} {device}"
     plt.suptitle(title, fontsize=16, y=0.98, fontweight="bold")
     sub = f"Batch: {batch}  |  Wafer: {wafer}  |  Date: {root.attrib.get('CreationDate', '?')}"
-    fig.text(0.5, 0.93, sub, ha="center", fontsize=11, color="dimgray")
+    fig.text(0.5, 0.95, sub, ha="center", fontsize=11, color="dimgray")
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out_path, dpi=110, bbox_inches="tight")
@@ -973,7 +1105,6 @@ def analyze_mzm(data_dir: Path = DATA_DIR) -> list[dict[str, object]]:
     total = len(xml_files)
     print(f"Found {total} MZM files", flush=True)
     for index, xml_path in enumerate(xml_files, start=1):
-        # in-place progress line: [6/98] updates on the same line
         print(f"\r[{index}/{total}] {xml_path.name:<55}", end="", flush=True)
         try:
             rows = summarize_xml(xml_path)
@@ -986,7 +1117,7 @@ def analyze_mzm(data_dir: Path = DATA_DIR) -> list[dict[str, object]]:
             analyze_modulation_efficiency_figure(xml_path, root)
         except Exception as exc:
             print(f"\n  ERROR {xml_path}: {exc}", flush=True)
-    print(flush=True)  # finish the progress line with a newline
+    print(flush=True)
 
     rows_by_wafer: dict[str, list[dict[str, object]]] = defaultdict(list)
     rows_by_wafer_date: dict[tuple[str, str], list[dict[str, object]]] = defaultdict(list)
@@ -999,13 +1130,9 @@ def analyze_mzm(data_dir: Path = DATA_DIR) -> list[dict[str, object]]:
     write_csv(CSV_DIR / "mzm_all_summary.csv", all_rows)
     for wafer, rows in sorted(rows_by_wafer.items()):
         write_csv(CSV_DIR / wafer / f"{wafer}_mzm_summary.csv", rows)
-        # plot_wafer_summary(wafer, rows, PNG_DIR / wafer / f"{wafer}_mzm_summary.png")
     for wafer, timestamp in all_measurement_folders:
         rows = rows_by_wafer_date.get((wafer, timestamp), [])
         write_csv(CSV_DIR / wafer / timestamp / f"{wafer}_{timestamp}_mzm_summary.csv", rows)
-        # if rows:
-        #     plot_wafer_summary(f"{wafer} {timestamp}", rows,
-        #                        PNG_DIR / wafer / timestamp / f"{wafer}_{timestamp}_mzm_summary.png")
 
     return all_rows
 
