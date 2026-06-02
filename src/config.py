@@ -10,6 +10,7 @@ DATA_DIR = Path("data")
 CSV_DIR = Path("res") / "csv"
 PNG_DIR = Path("res") / "png"
 MODULATION_EFFICIENCY_PNG_DIR = "07_wavelength_modulation_efficiency"
+VPI_VOLTAGE_PNG_DIR = "07_vpi_vs_voltage"
 EXTINCTION_RATIO_PNG_DIR = "08_extinction_ratio"
 
 THERMAL_VOLTAGE = 0.02585
@@ -29,5 +30,6 @@ CSV_COLUMNS = [
     "modulation_mean_dlambda_dv_nm_per_v",
     "modulation_dlambda_dv_by_null_nm_per_v",
     "modulation_null_wavelengths_0v_nm", "modulation_r2_by_null",
+    "vpi_mean_v", "vpi_min_v", "vpi_max_v", "vpi_by_null_v",
     "source_file",
 ]

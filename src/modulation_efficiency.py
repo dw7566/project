@@ -105,6 +105,19 @@ def analyze_modulation_efficiency(modulator: ET.Element) -> dict[str, object]:
     return result
 
 
+def vpi_values_from_analysis(analysis: dict[str, object]) -> list[float]:
+    fsr = float(analysis.get("fsr_nm", float("nan")))
+    if not np.isfinite(fsr) or fsr <= 0.0:
+        return []
+
+    vpi_values = []
+    for track in analysis.get("track_results", []):
+        dlambda_dv = float(track.get("dlambda_dv", float("nan")))
+        if np.isfinite(dlambda_dv) and dlambda_dv != 0.0:
+            vpi_values.append(fsr / (2.0 * abs(dlambda_dv)))
+    return vpi_values
+
+
 def extract_modulation_efficiency(modulator: ET.Element) -> dict[str, object]:
     empty = {
         "modulation_null_count": 0, "modulation_fsr_nm": "",
@@ -113,6 +126,7 @@ def extract_modulation_efficiency(modulator: ET.Element) -> dict[str, object]:
         "modulation_dlambda_dv_by_null_nm_per_v": "",
         "modulation_null_wavelengths_0v_nm": "",
         "modulation_r2_by_null": "",
+        "vpi_mean_v": "", "vpi_min_v": "", "vpi_max_v": "", "vpi_by_null_v": "",
     }
 
     analysis = analyze_modulation_efficiency(modulator)
@@ -120,6 +134,7 @@ def extract_modulation_efficiency(modulator: ET.Element) -> dict[str, object]:
     if not track_results:
         return empty
 
+    vpi_values = vpi_values_from_analysis(analysis)
     return {
         "modulation_null_count": len(track_results),
         "modulation_fsr_nm": csv_float(float(analysis["fsr_nm"])),
@@ -131,6 +146,10 @@ def extract_modulation_efficiency(modulator: ET.Element) -> dict[str, object]:
             f"{item['wl_0v']:.4f}" for item in track_results),
         "modulation_r2_by_null": ";".join(
             f"{item['r2']:.6f}" for item in track_results),
+        "vpi_mean_v": csv_float(float(np.mean(vpi_values))) if vpi_values else "",
+        "vpi_min_v": csv_float(float(np.min(vpi_values))) if vpi_values else "",
+        "vpi_max_v": csv_float(float(np.max(vpi_values))) if vpi_values else "",
+        "vpi_by_null_v": ";".join(f"{value:.6f}" for value in vpi_values),
     }
 
 
@@ -199,12 +218,20 @@ def plot_modulation_efficiency_panels(axes, root: ET.Element) -> None:
         f"FSR: {_fmt(analysis['fsr_nm'], '.3f')} nm",
         f"Mean |dLambda/dV|: {_fmt(analysis['mean_abs_dlambda_dv'], '.4f')} nm/V",
         f"Mean dLambda/dV: {_fmt(analysis['mean_dlambda_dv'], '.4f')} nm/V",
-        "", "Per null:",
     ]
-    for track in track_results:
+    vpi_values = vpi_values_from_analysis(analysis)
+    if vpi_values:
+        summary.extend([
+            f"Mean V_pi: {_fmt(np.mean(vpi_values), '.3f')} V",
+            f"V_pi range: {_fmt(np.min(vpi_values), '.3f')} ~ {_fmt(np.max(vpi_values), '.3f')} V",
+        ])
+    summary.extend(["", "Per null:"])
+    for index, track in enumerate(track_results):
+        vpi_text = _fmt(vpi_values[index], ".3f") if index < len(vpi_values) else "n/a"
         summary.append(
             f"@{float(track['wl_0v']):7.2f} nm  "
             f"{float(track['dlambda_dv']): .4f} nm/V  "
+            f"Vpi={vpi_text} V  "
             f"R2={float(track['r2']):.4f}")
 
     ax_summary.set_axis_off()

@@ -18,9 +18,7 @@ from .spectrum import (
     mzi_model, measure_fsr, flatten_to_envelope, device_fsr_fallback,
 )
 from .iv_analysis import plot_iv_log, plot_iv_analysis
-from .modulation_efficiency import (
-    plot_modulation_efficiency_panels, analyze_modulation_efficiency_figure,
-)
+from .vpi_analysis import plot_vpi_voltage_panels, analyze_vpi_voltage_figure
 from .extinction_ratio import (
     plot_extinction_ratio_panels, analyze_extinction_ratio_figure,
 )
@@ -93,6 +91,15 @@ def clean_legacy_outputs() -> None:
     if CSV_DIR.exists():
         for csv_path in CSV_DIR.glob("D*_mzm_summary.csv"):
             csv_path.unlink()
+
+    old_summary_png = config.PNG_DIR / "vpi_summary.png"
+    if old_summary_png.exists():
+        old_summary_png.unlink()
+
+    legacy_modulation_dir = config.PNG_DIR / config.MODULATION_EFFICIENCY_PNG_DIR
+    if legacy_modulation_dir.exists():
+        for png_path in legacy_modulation_dir.rglob("*LMZ*.png"):
+            png_path.unlink()
 
 
 def measurement_folders(data_dir: Path) -> list[tuple[str, str]]:
@@ -251,8 +258,8 @@ def analyze_figure(xml_path: Path, out_path: Path) -> bool:
     plot_iv_log(axes[1, 1], iv)
     plot_iv_analysis(axes[1, 2], iv)
 
-    # Row 2: 변조효율
-    plot_modulation_efficiency_panels(axes[2, :], root)
+    # Row 2: V_pi vs voltage
+    plot_vpi_voltage_panels(axes[2, :], root)
 
     # Row 3: 소광비
     plot_extinction_ratio_panels(axes[3, :], root)
@@ -294,7 +301,7 @@ def analyze_mzm(data_dir: Path = DATA_DIR) -> list[dict[str, object]]:
             timestamp = xml_path.parent.name
             output_path = unique_png_path(wafer, timestamp, xml_path, used_png_names_by_folder)
             analyze_figure(xml_path, output_path)
-            analyze_modulation_efficiency_figure(xml_path, root)
+            analyze_vpi_voltage_figure(xml_path, root)
             analyze_extinction_ratio_figure(xml_path, root)
         except Exception as exc:
             print(f"\n  ERROR {xml_path}: {exc}", flush=True)
