@@ -90,6 +90,21 @@ def clean_legacy_outputs() -> None:
     if CSV_DIR.exists():
         for csv_path in CSV_DIR.glob("D*_mzm_summary.csv"):
             csv_path.unlink()
+        for csv_path in CSV_DIR.glob("D*/D*_mzm_summary.csv"):
+            csv_path.unlink()
+        for wafer_dir in CSV_DIR.glob("D*"):
+            if not wafer_dir.is_dir():
+                continue
+            for timestamp_dir in wafer_dir.iterdir():
+                if not timestamp_dir.is_dir():
+                    continue
+                legacy_csv = timestamp_dir / f"{wafer_dir.name}_{timestamp_dir.name}_mzm_summary.csv"
+                if legacy_csv.exists():
+                    legacy_csv.unlink()
+                try:
+                    timestamp_dir.rmdir()
+                except OSError:
+                    pass
 
     old_summary_png = config.PNG_DIR / "vpi_summary.png"
     if old_summary_png.exists():
@@ -113,7 +128,7 @@ def mirror_result_folders(data_dir: Path) -> list[tuple[str, str]]:
     folders = measurement_folders(data_dir)
     for wafer, timestamp in folders:
         (config.PNG_DIR / wafer / timestamp).mkdir(parents=True, exist_ok=True)
-        (CSV_DIR / wafer / timestamp).mkdir(parents=True, exist_ok=True)
+        (CSV_DIR / wafer).mkdir(parents=True, exist_ok=True)
     return folders
 
 
@@ -306,20 +321,16 @@ def analyze_mzm(data_dir: Path = DATA_DIR) -> list[dict[str, object]]:
             print(f"\n  ERROR {xml_path}: {exc}", flush=True)
     print(flush=True)
 
-    rows_by_wafer: dict[str, list[dict[str, object]]] = defaultdict(list)
     rows_by_wafer_date: dict[tuple[str, str], list[dict[str, object]]] = defaultdict(list)
     for row in all_rows:
         wafer = str(row["wafer"])
         timestamp = str(row["timestamp"])
-        rows_by_wafer[wafer].append(row)
         rows_by_wafer_date[(wafer, timestamp)].append(row)
 
     write_csv(CSV_DIR / "mzm_all_summary.csv", all_rows)
-    for wafer, rows in sorted(rows_by_wafer.items()):
-        write_csv(CSV_DIR / wafer / f"{wafer}_mzm_summary.csv", rows)
     for wafer, timestamp in all_measurement_folders:
         rows = rows_by_wafer_date.get((wafer, timestamp), [])
-        write_csv(CSV_DIR / wafer / timestamp / f"{wafer}_{timestamp}_mzm_summary.csv", rows)
+        write_csv(CSV_DIR / wafer / f"{timestamp}.csv", rows)
 
     return all_rows
 
