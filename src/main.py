@@ -22,6 +22,7 @@ from .insertion_loss import plot_insertion_loss_panel
 from .vpi_analysis import plot_vpi_voltage_panels
 from .extinction_ratio import plot_extinction_ratio_panels
 from .csv_export import summarize_xml, write_csv
+from .wafermap import plot_wafermap
 
 
 def mean(values: list[float]) -> float:
@@ -331,6 +332,8 @@ def analyze_mzm(data_dir: Path = DATA_DIR) -> list[dict[str, object]]:
     for wafer, timestamp in all_measurement_folders:
         rows = rows_by_wafer_date.get((wafer, timestamp), [])
         write_csv(CSV_DIR / wafer / f"{timestamp}.csv", rows)
+        if rows:
+            plot_wafermap(wafer, timestamp, rows, config.PNG_DIR / wafer / timestamp / "wafermap.png")
 
     return all_rows
 
