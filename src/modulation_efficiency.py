@@ -1,16 +1,12 @@
 from __future__ import annotations
 
 import xml.etree.ElementTree as ET
-from pathlib import Path
 
-import matplotlib.pyplot as plt
 import numpy as np
 from scipy.signal import argrelextrema
 
-from . import config
 from .xml_parser import (
-    attr_any, csv_float, find_mzm_modulators,
-    parse_modulation_sweeps, interpolate_sweeps,
+    csv_float, find_mzm_modulators, parse_modulation_sweeps, interpolate_sweeps,
 )
 
 
@@ -105,6 +101,19 @@ def analyze_modulation_efficiency(modulator: ET.Element) -> dict[str, object]:
     return result
 
 
+def vpi_values_from_analysis(analysis: dict[str, object]) -> list[float]:
+    fsr = float(analysis.get("fsr_nm", float("nan")))
+    if not np.isfinite(fsr) or fsr <= 0.0:
+        return []
+
+    vpi_values = []
+    for track in analysis.get("track_results", []):
+        dlambda_dv = float(track.get("dlambda_dv", float("nan")))
+        if np.isfinite(dlambda_dv) and dlambda_dv != 0.0:
+            vpi_values.append(fsr / (2.0 * abs(dlambda_dv)))
+    return vpi_values
+
+
 def extract_modulation_efficiency(modulator: ET.Element) -> dict[str, object]:
     empty = {
         "modulation_null_count": 0, "modulation_fsr_nm": "",
@@ -113,6 +122,7 @@ def extract_modulation_efficiency(modulator: ET.Element) -> dict[str, object]:
         "modulation_dlambda_dv_by_null_nm_per_v": "",
         "modulation_null_wavelengths_0v_nm": "",
         "modulation_r2_by_null": "",
+        "vpi_mean_v": "", "vpi_min_v": "", "vpi_max_v": "", "vpi_by_null_v": "",
     }
 
     analysis = analyze_modulation_efficiency(modulator)
@@ -120,6 +130,7 @@ def extract_modulation_efficiency(modulator: ET.Element) -> dict[str, object]:
     if not track_results:
         return empty
 
+    vpi_values = vpi_values_from_analysis(analysis)
     return {
         "modulation_null_count": len(track_results),
         "modulation_fsr_nm": csv_float(float(analysis["fsr_nm"])),
@@ -131,6 +142,10 @@ def extract_modulation_efficiency(modulator: ET.Element) -> dict[str, object]:
             f"{item['wl_0v']:.4f}" for item in track_results),
         "modulation_r2_by_null": ";".join(
             f"{item['r2']:.6f}" for item in track_results),
+        "vpi_mean_v": csv_float(float(np.mean(vpi_values))) if vpi_values else "",
+        "vpi_min_v": csv_float(float(np.min(vpi_values))) if vpi_values else "",
+        "vpi_max_v": csv_float(float(np.max(vpi_values))) if vpi_values else "",
+        "vpi_by_null_v": ";".join(f"{value:.6f}" for value in vpi_values),
     }
 
 
@@ -199,12 +214,20 @@ def plot_modulation_efficiency_panels(axes, root: ET.Element) -> None:
         f"FSR: {_fmt(analysis['fsr_nm'], '.3f')} nm",
         f"Mean |dLambda/dV|: {_fmt(analysis['mean_abs_dlambda_dv'], '.4f')} nm/V",
         f"Mean dLambda/dV: {_fmt(analysis['mean_dlambda_dv'], '.4f')} nm/V",
-        "", "Per null:",
     ]
-    for track in track_results:
+    vpi_values = vpi_values_from_analysis(analysis)
+    if vpi_values:
+        summary.extend([
+            f"Mean V_pi: {_fmt(np.mean(vpi_values), '.3f')} V",
+            f"V_pi range: {_fmt(np.min(vpi_values), '.3f')} ~ {_fmt(np.max(vpi_values), '.3f')} V",
+        ])
+    summary.extend(["", "Per null:"])
+    for index, track in enumerate(track_results):
+        vpi_text = _fmt(vpi_values[index], ".3f") if index < len(vpi_values) else "n/a"
         summary.append(
             f"@{float(track['wl_0v']):7.2f} nm  "
             f"{float(track['dlambda_dv']): .4f} nm/V  "
+            f"Vpi={vpi_text} V  "
             f"R2={float(track['r2']):.4f}")
 
     ax_summary.set_axis_off()
@@ -212,36 +235,3 @@ def plot_modulation_efficiency_panels(axes, root: ET.Element) -> None:
                     va="top", ha="left", fontsize=9, family="monospace",
                     bbox=dict(boxstyle="round,pad=0.45", fc="lightyellow",
                               ec="0.5", lw=0.8, alpha=0.95))
-
-
-def modulation_efficiency_png_path(xml_path: Path, root: ET.Element) -> Path:
-    test_site_info = root.find("./TestSiteInfo")
-    batch = attr_any(test_site_info, "Batch", default=xml_path.parents[2].name)
-    wafer = attr_any(test_site_info, "Wafer", default=xml_path.parent.parent.name)
-    timestamp = xml_path.parent.name
-    return config.PNG_DIR / config.MODULATION_EFFICIENCY_PNG_DIR / batch / wafer / timestamp / f"{xml_path.stem}.png"
-
-
-def analyze_modulation_efficiency_figure(xml_path: Path, root: ET.Element | None = None) -> bool:
-    if root is None:
-        root = ET.parse(xml_path).getroot()
-
-    out_path = modulation_efficiency_png_path(xml_path, root)
-    fig, axes = plt.subplots(1, 3, figsize=(18, 6))
-    fig.subplots_adjust(left=0.055, right=0.985, bottom=0.16, top=0.80, wspace=0.32)
-    plot_modulation_efficiency_panels(axes, root)
-
-    test_site_info = root.find("./TestSiteInfo")
-    batch = attr_any(test_site_info, "Batch", default="?")
-    wafer = attr_any(test_site_info, "Wafer", default="?")
-    device = attr_any(test_site_info, "TestSite", default="?")
-    die = f"({attr_any(test_site_info, 'DieColumn', default='?')},{attr_any(test_site_info, 'DieRow', default='?')})"
-    fig.suptitle(f"Wavelength Modulation Efficiency for {wafer} {die} {device}",
-                 fontsize=14, fontweight="bold", y=0.97)
-    fig.text(0.5, 0.91, f"Batch: {batch}  |  Date: {root.attrib.get('CreationDate', '?')}",
-             ha="center", fontsize=10, color="dimgray")
-
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(out_path, dpi=150, bbox_inches="tight")
-    plt.close(fig)
-    return True

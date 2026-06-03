@@ -11,6 +11,7 @@ from .xml_parser import (
     parse_float_list, nearest_value,
 )
 from .modulation_efficiency import extract_modulation_efficiency
+from .insertion_loss import insertion_loss_db
 
 
 def summarize_xml(xml_path: Path) -> list[dict[str, object]]:
@@ -70,8 +71,10 @@ def summarize_xml(xml_path: Path) -> list[dict[str, object]]:
                     "current_at_plus_1v_a": current_plus_1v,
                     "wavelength_start_nm": wavelength[0],
                     "wavelength_stop_nm": wavelength[-1],
-                    "point_count": count, "il_min_db": il_min, "il_max_db": il_max,
+                    "il_min_db": il_min, "il_max_db": il_max,
                     "il_mean_db": statistics.fmean(il),
+                    "insertion_loss_db": insertion_loss_db(
+                        wavelength, il, test_site, device_name, xml_path.name),
                     "extinction_ratio_db": il_max - il_min,
                     "wavelength_at_min_il_nm": wavelength[min_index],
                     "wavelength_at_max_il_nm": wavelength[max_index],
