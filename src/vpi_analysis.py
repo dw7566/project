@@ -141,20 +141,6 @@ def vpi_voltage_curves(root: ET.Element) -> tuple[list[dict[str, object]], str, 
     return [], "", {}
 
 
-def _format(value: object, spec: str) -> str:
-    try:
-        numeric = float(value)
-    except (TypeError, ValueError):
-        return "n/a"
-    return format(numeric, spec) if np.isfinite(numeric) else "n/a"
-
-
-def _all_vpi(curves: list[dict[str, object]]) -> np.ndarray:
-    if not curves:
-        return np.array([], dtype=float)
-    return np.concatenate([np.asarray(curve["vpi"], dtype=float) for curve in curves])
-
-
 def _mean_vpi_by_voltage(curves: list[dict[str, object]]) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     grouped: dict[float, list[float]] = {}
     for curve in curves:
@@ -171,16 +157,16 @@ def _mean_vpi_by_voltage(curves: list[dict[str, object]]) -> tuple[np.ndarray, n
 
 
 def plot_vpi_voltage_panels(axes, root: ET.Element) -> None:
-    ax_curve, ax_mean, ax_summary = axes
-    curves, source, analysis = vpi_voltage_curves(root)
+    ax_curve, ax_mean = axes
+    curves, _source, _analysis = vpi_voltage_curves(root)
     if not curves:
         for ax in axes:
             ax.set_axis_off()
-        ax_summary.text(
+        ax_curve.text(
             0.5,
             0.5,
             "V_pi vs voltage\nNo V_pi array or valid null tracks found",
-            transform=ax_summary.transAxes,
+            transform=ax_curve.transAxes,
             ha="center",
             va="center",
             color="red",
@@ -210,37 +196,3 @@ def plot_vpi_voltage_panels(axes, root: ET.Element) -> None:
     ax_mean.set_xlabel("DC bias [V]")
     ax_mean.set_ylabel("Mean V_pi [V]")
     ax_mean.grid(True, linestyle="--", alpha=0.35)
-
-    values = _all_vpi(curves)
-    summary = [
-        "V_pi vs voltage",
-        f"Source: {source}",
-        f"Curves: {len(curves)}",
-        f"Voltage range: {_format(np.min(voltage), '.2f')} ~ {_format(np.max(voltage), '.2f')} V",
-        f"Mean V_pi: {_format(np.mean(values), '.3f')} V",
-        f"V_pi range: {_format(np.min(values), '.3f')} ~ {_format(np.max(values), '.3f')} V",
-    ]
-    if source == "fitted":
-        summary.extend(
-            [
-                f"FSR: {_format(analysis.get('fsr_nm'), '.3f')} nm",
-                "Formula: FSR / (2*abs(dLambda/dV))",
-            ]
-        )
-    summary.extend(["", "Per curve:"])
-    for curve in curves:
-        curve_values = np.asarray(curve["vpi"], dtype=float)
-        summary.append(f"{curve['label']}: mean={np.mean(curve_values):.3f} V")
-
-    ax_summary.set_axis_off()
-    ax_summary.text(
-        0.03,
-        0.97,
-        "\n".join(summary),
-        transform=ax_summary.transAxes,
-        va="top",
-        ha="left",
-        fontsize=9,
-        family="monospace",
-        bbox=dict(boxstyle="round,pad=0.45", fc="lightyellow", ec="0.5", lw=0.8, alpha=0.95),
-    )

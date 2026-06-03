@@ -18,6 +18,7 @@ from .spectrum import (
     mzi_model, measure_fsr, flatten_to_envelope, device_fsr_fallback,
 )
 from .iv_analysis import plot_iv_log, plot_iv_analysis
+from .insertion_loss import plot_insertion_loss_panel
 from .vpi_analysis import plot_vpi_voltage_panels
 from .extinction_ratio import plot_extinction_ratio_panels
 from .csv_export import summarize_xml, write_csv
@@ -149,10 +150,10 @@ def analyze_figure(xml_path: Path, out_path: Path) -> bool:
     fsr_fallback = device_fsr_fallback(root)
 
     fig, axes = plt.subplots(4, 3, figsize=(20, 20))
-    plt.subplots_adjust(hspace=0.45, wspace=0.3)
+    fig.subplots_adjust(hspace=0.45, wspace=0.3)
 
     # Row 0, Col 0
-    ax1 = axes[0, 0]
+    ax1 = axes[0][0]
     for index, sweep in enumerate(sweeps):
         wavelength = sweep["L"]
         il = sweep["IL"]
@@ -166,7 +167,7 @@ def analyze_figure(xml_path: Path, out_path: Path) -> bool:
     ax1.grid(True, ls="--", alpha=0.5)
 
     # Row 0, Col 1
-    ax2 = axes[0, 1]
+    ax2 = axes[0][1]
     ref_fit = poly_func(ref_l)
     r2_ref = r2_score(ref_il, ref_fit)
     ax2.plot(ref_l, ref_il, "b", label="Raw Data", linewidth=1.0)
@@ -178,7 +179,7 @@ def analyze_figure(xml_path: Path, out_path: Path) -> bool:
     ax2.grid(True, ls="--", alpha=0.5)
 
     # Row 0, Col 2
-    ax3 = axes[0, 2]
+    ax3 = axes[0][2]
     for index, sweep in enumerate(sweeps):
         wavelength = sweep["L"]
         il = sweep["IL"]
@@ -201,7 +202,7 @@ def analyze_figure(xml_path: Path, out_path: Path) -> bool:
     ax3.grid(True, ls="--", alpha=0.5)
 
     # Row 1, Col 0
-    ax4 = axes[1, 0]
+    ax4 = axes[1][0]
     mzm = pick_sweep(sweeps, MOD_BIAS)
     if mzm is not None:
         wavelength = mzm["L"]
@@ -252,14 +253,17 @@ def analyze_figure(xml_path: Path, out_path: Path) -> bool:
     ax4.grid(True, ls="--", alpha=0.5)
 
     # Row 1, Col 1 & 2
-    plot_iv_log(axes[1, 1], iv)
-    plot_iv_analysis(axes[1, 2], iv)
+    plot_iv_log(axes[1][1], iv)
+    plot_iv_analysis(axes[1][2], iv)
 
-    # Row 2: V_pi vs voltage
-    plot_vpi_voltage_panels(axes[2, :], root)
+    # Row 2: insertion loss and V_pi vs voltage
+    plot_insertion_loss_panel(axes[2][0], root, sweeps)
+    plot_vpi_voltage_panels([axes[2][1], axes[2][2]], root)
 
-    # Row 3: 소광비
-    plot_extinction_ratio_panels(axes[3, :], root)
+    # Row 3: extinction ratio
+    plot_extinction_ratio_panels([axes[3][0], axes[3][1]], root)
+
+    axes[3][2].set_axis_off()
 
     # 타이틀
     test_site_info = root.find(".//TestSiteInfo")
@@ -268,7 +272,7 @@ def analyze_figure(xml_path: Path, out_path: Path) -> bool:
     device = attr_any(test_site_info, "TestSite", default="?")
     die = f"({attr_any(test_site_info, 'DieColumn', default='?')},{attr_any(test_site_info, 'DieRow', default='?')})"
     title = f"Analysis for {wafer} {die} {device}"
-    plt.suptitle(title, fontsize=16, y=0.98, fontweight="bold")
+    fig.suptitle(title, fontsize=16, y=0.98, fontweight="bold")
     sub = f"Batch: {batch}  |  Wafer: {wafer}  |  Date: {root.attrib.get('CreationDate', '?')}"
     fig.text(0.5, 0.95, sub, ha="center", fontsize=11, color="dimgray")
 
