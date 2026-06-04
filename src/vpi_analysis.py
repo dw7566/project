@@ -104,14 +104,20 @@ def fitted_vpi_voltage_curves(modulator: ET.Element) -> tuple[list[dict[str, obj
         order = np.argsort(voltage)
         voltage = voltage[order]
         wavelength = wavelength[order]
-        if voltage.size == 2:
-            slope = (wavelength[1] - wavelength[0]) / (voltage[1] - voltage[0])
-            dlambda_dv = np.full(voltage.shape, slope, dtype=float)
+
+        # 2차 다항식 피팅: λ(V) = aV² + bV + c
+        # dλ/dV(V) = 2aV + b → 전압 의존성 반영
+        deg = min(2, voltage.size - 1)
+        coeffs = np.polyfit(voltage, wavelength, deg)
+
+        if deg == 2:
+            dlambda_dv = 2.0 * coeffs[0] * voltage + coeffs[1]
         else:
-            dlambda_dv = np.gradient(wavelength, voltage)
+            dlambda_dv = np.full(voltage.shape, coeffs[0], dtype=float)
 
         with np.errstate(divide="ignore", invalid="ignore"):
             vpi = fsr / (2.0 * np.abs(dlambda_dv))
+
         keep = np.isfinite(voltage) & np.isfinite(vpi) & (vpi > 0.0)
         if np.count_nonzero(keep) < 2:
             continue

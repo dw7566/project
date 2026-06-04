@@ -19,7 +19,7 @@ plt.rcParams["axes.unicode_minus"] = False
 CSV_COLUMNS = [
     "lot", "wafer", "test_site", "die_column", "die_row", "timestamp",
     "device_name", "dc_bias_v", "current_at_minus_1v_a", "current_at_0v_a",
-    "current_at_plus_1v_a", "il_min_db", "il_max_db", "il_mean_db", "insertion_loss_db",
+    "current_at_plus_1v_a", "il_min_db", "il_max_db", "il_mean_db",
     "extinction_ratio_db", "wavelength_at_min_il_nm", "wavelength_at_max_il_nm",
     "modulation_r2_by_null",
     "vpi_mean_v", "vpi_min_v", "vpi_max_v", "vpi_by_null_v",
