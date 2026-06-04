@@ -11,13 +11,11 @@ import numpy as np
 
 
 WAFERMAP_PARAMETERS = [
-    "insertion_loss_db",
     "extinction_ratio_db",
     "vpi_mean_v",
 ]
 
 HIGHER_IS_BETTER = {
-    "insertion_loss_db": True,
     "extinction_ratio_db": True,
     "vpi_mean_v": False,
 }
