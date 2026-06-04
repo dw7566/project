@@ -202,25 +202,10 @@ python run.py
 │ (1,0) MZM Linear     │ (1,1) IV Log scale   │ (1,2) IV Analysis    │
 │       FSR fit        │       fitting        │                      │
 ├──────────────────────┼──────────────────────┼──────────────────────┤
-│ (2,0) MZM dB         │ (2,1) Vπ Voltage     │ (2,2) [unused]       │
-│       Residual fit   │       curves         │                      │
+│ (2,0) MZM dB         │ (2,1) Vπ Voltage     │ (2,2) Extinction     │
+│       Residual fit   │       curves         │       Ratio          │     │
 ├──────────────────────┼──────────────────────┼──────────────────────┤
-│ (3,0) Extinction     │ (3,1) [unused]       │ (3,2) [unused]       │
-│       Ratio vs Bias  │                      │                      │
-└──────────────────────┴──────────────────────┴──────────────────────┘
 ```
-
-| Panel | Content |
-|-------|---------|
-| (0,0) | Raw transmission spectra for all bias conditions |
-| (0,1) | Reference sweep with 3rd-order polynomial fit + R² |
-| (0,2) | Flattened (processed) spectra after reference normalization |
-| (1,0) | MZI model fit on linear-scale transmission (FSR, R² shown) |
-| (1,1) | Dark current IV in log-log scale |
-| (1,2) | Forward bias Shockley + reverse bias analysis |
-| (2,0) | MZI model fit on dB-scale residuals (FSR detection) |
-| (2,1) | Vπ vs wavelength + statistics |
-| (3,0) | Extinction ratio vs DC bias across measurement points |
 
 ### Wafer-Level Summary Figure
 
@@ -277,33 +262,9 @@ PNG_DIR = Path("res") / "png"
 
 Change the bias voltage used for MZM FSR fitting:
 
-```python
-# src/config.py
-MOD_BIAS = "-1.0"  # Modulation bias in Volts
 ```
-
-### Thermal Voltage Constant
-
-Adjust thermal voltage (affects IV curve fitting):
-
-```python
-# src/config.py
-THERMAL_VOLTAGE = 0.02585  # At room temperature ~25°C
-```
-
-### Output Figure DPI
-
-Modify resolution in `src/main.py`:
-
-```python
-fig.savefig(out_path, dpi=110, bbox_inches="tight")
-```
-
----
-
 ## 9. Project Structure
 
-```
 project/
 ├── run.py                      # Execution entry point
 ├── src/
@@ -336,9 +297,7 @@ project/
 │               └── wafermap.png # Wafer summary heatmap
 ├── requirements.txt            # Python dependencies
 └── README.md                   # This file
-```
 
----
 
 ## Requirements
 
