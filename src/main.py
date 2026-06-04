@@ -18,7 +18,6 @@ from .spectrum import (
     mzi_model, measure_fsr, flatten_to_envelope, device_fsr_fallback,
 )
 from .iv_analysis import plot_iv_log, plot_iv_analysis
-from .insertion_loss import plot_insertion_loss_panel
 from .vpi_analysis import plot_vpi_voltage_panels
 from .extinction_ratio import plot_extinction_ratio_panels
 from .csv_export import summarize_xml, write_csv
@@ -152,6 +151,112 @@ def unique_png_path(wafer: str, timestamp: str, xml_path: Path,
         index += 1
 
 
+def mzi_model_db(wavelength: np.ndarray, A: float, B: float, wl0: float,
+                 FSR: float, phi: float) -> np.ndarray:
+    linear = A + B * np.cos(np.pi * (wavelength - wl0) / FSR + phi) ** 2
+    return 10.0 * np.log10(np.maximum(linear, 1e-12))
+
+
+def plot_mzm_db_residual_fit(
+    ax,
+    sweeps: list[dict[str, object]],
+    poly_ref: np.poly1d,
+    fsr_fallback: float,
+) -> None:
+    mzm = pick_sweep(sweeps, MOD_BIAS)
+    if mzm is None:
+        ax.text(0.5, 0.5, f"Bias {MOD_BIAS}V\nNot Found", transform=ax.transAxes,
+                ha="center", va="center", color="red")
+        ax.set_axis_off()
+        return
+
+    wavelength = mzm["L"]
+    il_raw = mzm["IL"]
+    assert isinstance(wavelength, np.ndarray)
+    assert isinstance(il_raw, np.ndarray)
+
+    count = min(wavelength.size, il_raw.size)
+    wavelength = wavelength[:count]
+    il_raw = il_raw[:count]
+    finite = np.isfinite(wavelength) & np.isfinite(il_raw)
+    wavelength = wavelength[finite]
+    il_raw = il_raw[finite]
+    if wavelength.size < 8:
+        ax.text(0.5, 0.5, "Not enough MZM sweep data", transform=ax.transAxes,
+                ha="center", va="center", color="red")
+        ax.set_axis_off()
+        return
+
+    order = np.argsort(wavelength)
+    wavelength = wavelength[order]
+    il_raw = il_raw[order]
+
+    ax.plot(wavelength, il_raw, color="#7A9AFA", alpha=0.6,
+            label=f"MZM raw ({MOD_BIAS} V)")
+
+    try:
+        il_flat1 = il_raw - poly_ref(wavelength)
+        top_idx = il_flat1 > np.nanpercentile(il_flat1, 85)
+        if np.count_nonzero(top_idx) < 3:
+            top_idx = il_flat1 > np.nanpercentile(il_flat1, 75)
+        if np.count_nonzero(top_idx) < 3:
+            raise ValueError("not enough top-envelope points")
+
+        poly_resid = np.poly1d(np.polyfit(wavelength[top_idx], il_flat1[top_idx], 2))
+        il_target_db = il_flat1 - poly_resid(wavelength)
+
+        fit_mask = np.isfinite(wavelength) & np.isfinite(il_target_db)
+        wl_fit = wavelength[fit_mask]
+        target_fit = il_target_db[fit_mask]
+        if wl_fit.size < 8:
+            raise ValueError("not enough finite fitting points")
+
+        min_db = float(np.nanmin(target_fit))
+        a_guess = float(np.clip(10.0 ** (min_db / 10.0), 1e-9, 0.95))
+        b_guess = max(1.0 - a_guess, 1e-6)
+        fsr_guess = measure_fsr(wl_fit, target_fit, fallback=fsr_fallback)
+        if not np.isfinite(fsr_guess) or fsr_guess <= 0.0:
+            fsr_guess = fsr_fallback if fsr_fallback > 0 else 14.0
+
+        fsr_low = max(0.1, fsr_guess * 0.65)
+        fsr_high = max(fsr_low + 1e-6, fsr_guess * 1.45)
+        p0 = [a_guess, b_guess, float(np.mean(wl_fit)), fsr_guess, 0.0]
+        bounds = (
+            [0.0, 0.0, float(wl_fit.min()), fsr_low, -np.pi],
+            [max(a_guess * 2.0, 1e-6), 2.0, float(wl_fit.max()), fsr_high, np.pi],
+        )
+
+        popt, _ = curve_fit(
+            mzi_model_db,
+            wl_fit,
+            target_fit,
+            p0=p0,
+            bounds=bounds,
+            maxfev=10000,
+        )
+
+        il_fit_target_db = mzi_model_db(wavelength, *popt)
+        il_fit_original_db = il_fit_target_db + poly_resid(wavelength) + poly_ref(wavelength)
+        r2 = r2_score(target_fit, mzi_model_db(wl_fit, *popt))
+
+        ax.plot(wavelength, il_fit_original_db, "k--", linewidth=2,
+                label=f"MZI fit, R^2={r2:.4f}")
+        text = f"FSR: {popt[3]:.2f} nm\nR^2: {r2:.4f}"
+        ax.text(0.05, 0.05, text, transform=ax.transAxes, fontsize=9,
+                bbox=dict(boxstyle="round,pad=0.5", facecolor="white",
+                          alpha=0.8, edgecolor="gray"))
+    except Exception as exc:
+        ax.text(0.5, 0.5, f"Fitting Failed\n{exc}", transform=ax.transAxes,
+                ha="center", va="center", color="red", fontsize="small")
+
+    ax.set_title(f"MZM fitting in dB scale residual ({MOD_BIAS} V)",
+                 fontsize=12, fontweight="bold")
+    ax.set_xlabel("Wavelength [nm]")
+    ax.set_ylabel("Measured transmission [dB]")
+    ax.grid(True, linestyle=":", alpha=0.6)
+    ax.legend(loc="lower center", fontsize="small")
+
+
 def analyze_figure(xml_path: Path, out_path: Path) -> bool:
     root, sweeps, iv = load_xml(xml_path)
     if not sweeps:
@@ -272,13 +377,14 @@ def analyze_figure(xml_path: Path, out_path: Path) -> bool:
     plot_iv_log(axes[1][1], iv)
     plot_iv_analysis(axes[1][2], iv)
 
-    # Row 2: insertion loss and V_pi vs voltage
-    plot_insertion_loss_panel(axes[2][0], root, sweeps)
-    plot_vpi_voltage_panels([axes[2][1], axes[2][2]], root)
+    # Row 2: dB residual MZM fit and V_pi curves; omit mean-V_pi panel.
+    plot_mzm_db_residual_fit(axes[2][0], sweeps, poly_func, fsr_fallback)
+    plot_vpi_voltage_panels([axes[2][1]], root)
+    axes[2][2].set_axis_off()
 
-    # Row 3: extinction ratio
-    plot_extinction_ratio_panels([axes[3][0], axes[3][1]], root)
-
+    # Row 3: keep only ER vs DC bias; omit fringe-position panel.
+    plot_extinction_ratio_panels([axes[3][0]], root)
+    axes[3][1].set_axis_off()
     axes[3][2].set_axis_off()
 
     # 타이틀

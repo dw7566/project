@@ -73,7 +73,8 @@ def analyze_extinction_ratio(modulator: ET.Element) -> dict[str, object]:
 
 
 def plot_extinction_ratio_panels(axes, root: ET.Element) -> None:
-    ax_bias, ax_fringe = axes
+    ax_bias = axes[0]
+    ax_fringe = axes[1] if len(axes) > 1 else None
 
     modulators = find_mzm_modulators(root)
     if not modulators:
@@ -111,6 +112,9 @@ def plot_extinction_ratio_panels(axes, root: ET.Element) -> None:
     ax_bias.set_ylabel("Extinction ratio [dB]")
     ax_bias.legend(fontsize="x-small", loc="best")
     ax_bias.grid(True, ls="--", alpha=0.35)
+
+    if ax_fringe is None:
+        return
 
     idx_0v = int(np.argmin(np.abs(bias_arr - 0.0)))
     res_0v = er_results[idx_0v]

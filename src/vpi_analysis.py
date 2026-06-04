@@ -157,7 +157,8 @@ def _mean_vpi_by_voltage(curves: list[dict[str, object]]) -> tuple[np.ndarray, n
 
 
 def plot_vpi_voltage_panels(axes, root: ET.Element) -> None:
-    ax_curve, ax_mean = axes
+    ax_curve = axes[0]
+    ax_mean = axes[1] if len(axes) > 1 else None
     curves, _source, _analysis = vpi_voltage_curves(root)
     if not curves:
         for ax in axes:
@@ -189,10 +190,12 @@ def plot_vpi_voltage_panels(axes, root: ET.Element) -> None:
     ax_curve.grid(True, linestyle="--", alpha=0.35)
     ax_curve.legend(fontsize="x-small", loc="best")
 
+    if ax_mean is None:
+        return
+
     voltage, means, mins, maxs = _mean_vpi_by_voltage(curves)
     yerr = np.vstack([means - mins, maxs - means])
     ax_mean.errorbar(voltage, means, yerr=yerr, marker="o", capsize=4, linewidth=1.5)
-    ax_mean.set_title("Mean V_pi by voltage")
     ax_mean.set_xlabel("DC bias [V]")
     ax_mean.set_ylabel("Mean V_pi [V]")
     ax_mean.grid(True, linestyle="--", alpha=0.35)
