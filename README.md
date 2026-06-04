@@ -6,7 +6,8 @@
 [1. Introduction](#1-introduction)\
 [2. Project information](#2-project-information)\
 [3. Run](#3-install-and-run)\
-[4. Description of the module file feature](#4-description-of-the-module-file-feature)
+[4. Description of the module file feature](#4-description-of-the-module-file-feature)\
+[5. Run file algorithm](#5-run-file-algorithm)
 
 ---
 
@@ -36,13 +37,11 @@ The goal is to process wafer-scale XML measurement data, extract MZM-related dev
  ####
  + **Detailed project**
 
-
      Main analysis targets
      + Wafer
      + Die row & column
      + MZM XML measurement files
      + Optical spectrum and IV characteristics
-
 
  ####
 + **Run file description**
@@ -76,23 +75,57 @@ python run.py
 
 ## 4. Description of the module file feature
 
-* Fitting module
+* **Fitting module**
    + The graph is drawn by parsing raw wavelength sweep, insertion loss, current, and voltage data from XML files.
    + The module normalizes transmission spectra using a reference sweep, performs MZM fitting, estimates fitting quality such as R-squared, and visualizes IV behavior and optical response.
 
-* CSV module
-  + It contains a variety of measurement information, including lot, wafer, test site, die column, die row, timestamp, device name, bias, current values, wavelength range, insertion-loss statistics, and extinction ratio.
-  + Create a dataframe-style CSV summary so that the measured information in the XML files can be viewed at a glance.
-  + Save this data frame in CSV format in the `res/csv` folder.
+* **CSV module**
+  + It contains a variety of measurement information, including lot, wafer, test site, die column, die row, timestamp, device name, bias, current values, wavelength range, and insertion-loss statistics.
+  + Creates a dataframe-style CSV summary so that the measured information in the XML files can be viewed at a glance.
+  + Saves this data frame in CSV format in the `res/csv` folder.
 
- ---
-## 5. Run file algorithm
-* First of all
-   + Prepare the measurement XML files under the `data` directory.
-
-
-* And then
-  + The `main` function in `run.py` is executed.
-* Next
-   + `src/MZMfitting.py` searches for MZM XML files, creates analysis figures, and writes wafer-level and timestamp-level CSV summaries.
 ---
+
+## 5. Run file algorithm
+
+* **Preparation**
+   + Place the measurement XML files under the `data` directory.
+
+* **Execution**
+   + The `main` function in `run.py` is executed.
+   + `src/MZMfitting.py` searches for MZM XML files, creates analysis figures, and writes wafer-level and timestamp-level CSV summaries.
+
+* **Output**
+   + Analysis results are generated automatically and saved in the `res` directory.
+   + CSV summaries are stored in `res/csv` folder.
+   + Generated figures are stored in `res/png` folder.
+
+---
+
+## Project Structure
+
+```
+project/
+├── data/                    # Input directory for XML measurement files
+├── res/                     # Output directory for results
+│   ├── csv/                # CSV analysis results
+│   └── png/                # Generated analysis figures
+├── src/
+│   ├── ...      # Main fitting and analysis module
+│   └── ...                 # Other module files
+├── run.py                  # Main execution script
+├── requirements.txt        # Python dependencies
+└── README.md              # This file
+```
+
+---
+
+## Requirements
+
+This project requires Python 3.7+ with the following dependencies:
+- See `requirements.txt` for a complete list of required packages.
+
+
+---
+
+**Last Updated**: 2026-06-04
