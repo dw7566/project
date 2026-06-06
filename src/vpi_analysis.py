@@ -5,13 +5,191 @@ import statistics
 import xml.etree.ElementTree as ET
 
 import numpy as np
+from scipy.signal import argrelextrema
 
-from .modulation_efficiency import (
-    MIN_ABS_D_LAMBDA_DV_NM_PER_V,
-    analyze_modulation_efficiency,
-    valid_vpi_track,
+from .xml_parser import (
+    attr_any,
+    csv_float,
+    find_mzm_modulators,
+    interpolate_sweeps,
+    parse_float_list,
+    parse_modulation_sweeps,
 )
-from .xml_parser import attr_any, find_mzm_modulators, parse_float_list
+
+
+MIN_VPI_TRACK_R2 = 0.5
+MIN_ABS_D_LAMBDA_DV_NM_PER_V = 0.02
+
+
+def estimate_modulation_fsr(wavelength: np.ndarray, il: np.ndarray) -> float:
+    band_mask = (wavelength >= 1535.0) & (wavelength <= 1575.0)
+    if np.count_nonzero(band_mask) < 3:
+        span = float(wavelength[-1] - wavelength[0])
+        band_mask = (
+            (wavelength >= wavelength[0] + 0.1 * span)
+            & (wavelength <= wavelength[-1] - 0.1 * span)
+        )
+    maxima_idx = argrelextrema(il[band_mask], np.greater, order=40)[0]
+    wl_masked = wavelength[band_mask]
+    if maxima_idx.size < 2:
+        return float("nan")
+    spacing = np.diff(wl_masked[maxima_idx])
+    spacing = spacing[np.isfinite(spacing) & (spacing > 0)]
+    return float(np.mean(spacing)) if spacing.size else float("nan")
+
+
+def empty_modulation_analysis() -> dict[str, object]:
+    return {
+        "biases": np.array([], dtype=float),
+        "wavelength": np.array([], dtype=float),
+        "il_matrix": np.empty((0, 0), dtype=float),
+        "track_results": [],
+        "fsr_nm": float("nan"),
+        "mean_abs_dlambda_dv": float("nan"),
+        "mean_dlambda_dv": float("nan"),
+    }
+
+
+def analyze_modulation_efficiency(modulator: ET.Element) -> dict[str, object]:
+    result = empty_modulation_analysis()
+
+    interpolated = interpolate_sweeps(parse_modulation_sweeps(modulator))
+    if interpolated is None:
+        return result
+    biases, wavelength, il_matrix = interpolated
+    result.update({"biases": biases, "wavelength": wavelength, "il_matrix": il_matrix})
+
+    null_tracks: dict[int, dict[float, float]] = {}
+    for index, bias in enumerate(biases):
+        minima_idx = argrelextrema(il_matrix[index], np.less, order=50)[0]
+        deep_minima = [idx for idx in minima_idx if il_matrix[index][idx] < -30.0]
+        for minimum_idx in deep_minima:
+            null_wavelength = float(wavelength[minimum_idx])
+            matched = False
+            for track in null_tracks.values():
+                if any(abs(null_wavelength - existing) < 2.0 for existing in track.values()):
+                    track[bias] = null_wavelength
+                    matched = True
+                    break
+            if not matched:
+                null_tracks[len(null_tracks)] = {bias: null_wavelength}
+
+    full_tracks = {
+        null_id: track
+        for null_id, track in null_tracks.items()
+        if len(track) == biases.size
+    }
+
+    track_results = []
+    for null_id, track in sorted(full_tracks.items()):
+        v_arr = np.asarray(sorted(track), dtype=float)
+        wl_arr = np.asarray([track[bias] for bias in v_arr], dtype=float)
+        if v_arr.size < 2:
+            continue
+        coeffs = np.polyfit(v_arr, wl_arr, 1)
+        wl_fit = np.polyval(coeffs, v_arr)
+        ss_res = float(np.sum((wl_arr - wl_fit) ** 2))
+        ss_tot = float(np.sum((wl_arr - np.mean(wl_arr)) ** 2))
+        r2 = 1.0 - ss_res / ss_tot if ss_tot > 0.0 else 0.0
+        track_results.append(
+            {
+                "null_id": null_id,
+                "v": v_arr,
+                "wl": wl_arr,
+                "coeffs": coeffs,
+                "dlambda_dv": float(coeffs[0]),
+                "wl_0v": float(np.polyval(coeffs, 0.0)),
+                "r2": r2,
+            }
+        )
+
+    if not track_results:
+        return result
+
+    dlambda_values = np.asarray([item["dlambda_dv"] for item in track_results], dtype=float)
+    fsr = estimate_modulation_fsr(wavelength, il_matrix[0])
+    result.update(
+        {
+            "track_results": track_results,
+            "fsr_nm": fsr,
+            "mean_abs_dlambda_dv": float(np.mean(np.abs(dlambda_values))),
+            "mean_dlambda_dv": float(np.mean(dlambda_values)),
+        }
+    )
+    return result
+
+
+def valid_vpi_track(track: dict[str, object]) -> bool:
+    try:
+        dlambda_dv = abs(float(track.get("dlambda_dv", float("nan"))))
+        r2 = float(track.get("r2", float("nan")))
+    except (TypeError, ValueError):
+        return False
+    return (
+        np.isfinite(dlambda_dv)
+        and np.isfinite(r2)
+        and dlambda_dv >= MIN_ABS_D_LAMBDA_DV_NM_PER_V
+        and r2 >= MIN_VPI_TRACK_R2
+    )
+
+
+def vpi_value_for_track(track: dict[str, object], fsr: float) -> float | None:
+    if not np.isfinite(fsr) or fsr <= 0.0 or not valid_vpi_track(track):
+        return None
+    dlambda_dv = abs(float(track["dlambda_dv"]))
+    return fsr / (2.0 * dlambda_dv)
+
+
+def vpi_values_from_analysis(analysis: dict[str, object]) -> list[float]:
+    fsr = float(analysis.get("fsr_nm", float("nan")))
+    if not np.isfinite(fsr) or fsr <= 0.0:
+        return []
+
+    return [
+        vpi
+        for track in analysis.get("track_results", [])
+        if (vpi := vpi_value_for_track(track, fsr)) is not None
+    ]
+
+
+def extract_modulation_efficiency(modulator: ET.Element) -> dict[str, object]:
+    empty = {
+        "modulation_null_count": 0,
+        "modulation_fsr_nm": "",
+        "modulation_mean_abs_dlambda_dv_nm_per_v": "",
+        "modulation_mean_dlambda_dv_nm_per_v": "",
+        "modulation_dlambda_dv_by_null_nm_per_v": "",
+        "modulation_null_wavelengths_0v_nm": "",
+        "modulation_r2_by_null": "",
+        "vpi_mean_v": "",
+        "vpi_min_v": "",
+        "vpi_max_v": "",
+        "vpi_by_null_v": "",
+    }
+
+    analysis = analyze_modulation_efficiency(modulator)
+    track_results = analysis["track_results"]
+    if not track_results:
+        return empty
+
+    vpi_values = vpi_values_from_analysis(analysis)
+    return {
+        "modulation_null_count": len(track_results),
+        "modulation_fsr_nm": csv_float(float(analysis["fsr_nm"])),
+        "modulation_mean_abs_dlambda_dv_nm_per_v": csv_float(float(analysis["mean_abs_dlambda_dv"])),
+        "modulation_mean_dlambda_dv_nm_per_v": csv_float(float(analysis["mean_dlambda_dv"])),
+        "modulation_dlambda_dv_by_null_nm_per_v": ";".join(
+            f"{item['dlambda_dv']:.6f}" for item in track_results
+        ),
+        "modulation_null_wavelengths_0v_nm": ";".join(
+            f"{item['wl_0v']:.4f}" for item in track_results
+        ),
+        "modulation_r2_by_null": ";".join(f"{item['r2']:.6f}" for item in track_results),
+        "vpi_mean_v": csv_float(float(np.mean(vpi_values))) if vpi_values else "",
+        "vpi_min_v": csv_float(float(np.min(vpi_values))) if vpi_values else "",
+        "vpi_max_v": csv_float(float(np.max(vpi_values))) if vpi_values else "",
+        "vpi_by_null_v": ";".join(f"{value:.6f}" for value in vpi_values),
+    }
 
 
 def _local_name(tag: str) -> str:
