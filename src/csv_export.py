@@ -70,8 +70,6 @@ def summarize_xml(xml_path: Path) -> list[dict[str, object]]:
                     "wavelength_start_nm": wavelength[0],
                     "wavelength_stop_nm": wavelength[-1],
                     "extinction_ratio_db": il_max - il_min,
-                    "wavelength_at_min_il_nm": wavelength[min_index],
-                    "wavelength_at_max_il_nm": wavelength[max_index],
                     **modulation,
                     "source_file": str(xml_path),
                 }

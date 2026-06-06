@@ -20,7 +20,7 @@ CSV_COLUMNS = [
     "lot", "wafer", "test_site", "die_column", "die_row", "timestamp",
     "device_name", "dc_bias_v", "current_at_minus_1v_a", "current_at_0v_a",
     "current_at_plus_1v_a",
-    "extinction_ratio_db", "wavelength_at_min_il_nm", "wavelength_at_max_il_nm",
+    "extinction_ratio_db",
     "vpi_mean_v",
     "source_file",
 ]
