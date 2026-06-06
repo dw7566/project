@@ -21,6 +21,6 @@ CSV_COLUMNS = [
     "device_name", "dc_bias_v", "current_at_minus_2v_a",
     "current_at_minus_1v_a", "current_at_0v_a", "current_at_plus_1v_a",
     "extinction_ratio_db",
-    "vpi_mean_v",
+    "vpi_at_dc_bias_v",
     "source_file",
 ]

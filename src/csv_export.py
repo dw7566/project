@@ -9,7 +9,14 @@ from .xml_parser import (
     attr_any, die_coordinates, find_mzm_modulators,
     parse_float_list, nearest_value,
 )
-from .vpi_analysis import extract_modulation_efficiency
+from .vpi_analysis import extract_modulation_efficiency, vpi_by_bias_from_modulator
+
+
+def _bias_key(value: object) -> float | None:
+    try:
+        return round(float(str(value)), 6)
+    except (TypeError, ValueError):
+        return None
 
 
 def summarize_xml(xml_path: Path) -> list[dict[str, object]]:
@@ -43,8 +50,10 @@ def summarize_xml(xml_path: Path) -> list[dict[str, object]]:
         current_0v = nearest_value(voltage, current, 0.0)
         current_plus_1v = nearest_value(voltage, current, 1.0)
         modulation = extract_modulation_efficiency(modulator)
+        vpi_by_bias = vpi_by_bias_from_modulator(modulator)
 
         for sweep in modulator.findall("./PortCombo/WavelengthSweep"):
+            dc_bias = sweep.get("DCBias", "")
             wavelength = parse_float_list(sweep.findtext("./L"))
             il = parse_float_list(sweep.findtext("./IL"))
             if not wavelength or not il:
@@ -63,7 +72,7 @@ def summarize_xml(xml_path: Path) -> list[dict[str, object]]:
                     "lot": lot, "wafer": wafer, "test_site": test_site,
                     "die_column": die_column, "die_row": die_row,
                     "timestamp": timestamp, "device_name": device_name,
-                    "dc_bias_v": sweep.get("DCBias", ""),
+                    "dc_bias_v": dc_bias,
                     "current_at_minus_2v_a": current_minus_2v,
                     "current_at_minus_1v_a": current_minus_1v,
                     "current_at_0v_a": current_0v,
@@ -72,6 +81,7 @@ def summarize_xml(xml_path: Path) -> list[dict[str, object]]:
                     "wavelength_stop_nm": wavelength[-1],
                     "extinction_ratio_db": il_max - il_min,
                     **modulation,
+                    "vpi_at_dc_bias_v": vpi_by_bias.get(_bias_key(dc_bias), ""),
                     "source_file": str(xml_path),
                 }
             )

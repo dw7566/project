@@ -344,6 +344,17 @@ def _mean_vpi_by_voltage(curves: list[dict[str, object]]) -> tuple[np.ndarray, n
     return xs, means, mins, maxs
 
 
+def vpi_by_bias_from_modulator(modulator: ET.Element) -> dict[float, str]:
+    curves = explicit_vpi_voltage_curves(modulator)
+    if not curves:
+        curves, _analysis = fitted_vpi_voltage_curves(modulator)
+    voltage, means, _mins, _maxs = _mean_vpi_by_voltage(curves)
+    return {
+        round(float(bias), 6): csv_float(float(vpi))
+        for bias, vpi in zip(voltage, means)
+    }
+
+
 def plot_vpi_voltage_panels(axes, root: ET.Element) -> None:
     ax_curve = axes[0]
     ax_mean = axes[1] if len(axes) > 1 else None
