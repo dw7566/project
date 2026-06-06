@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+import re
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
 import numpy as np
+
+
+_DIE_COORDINATES_RE = re.compile(r"\((-?\d+),(-?\d+)\)")
 
 
 def parse_float_list(text: str | None) -> list[float]:
@@ -25,6 +29,16 @@ def attr_any(element: ET.Element | None, *names: str, default: str = "") -> str:
         if value is not None:
             return value
     return default
+
+
+def die_coordinates(xml_path: Path, test_site_info: ET.Element | None) -> tuple[str, str]:
+    match = _DIE_COORDINATES_RE.search(xml_path.stem)
+    if match:
+        return match.group(1), match.group(2)
+    return (
+        attr_any(test_site_info, "DieColumn", "Diecolumn"),
+        attr_any(test_site_info, "DieRow", "Dierow"),
+    )
 
 
 def nearest_value(xs: list[float], ys: list[float], target: float) -> float | None:

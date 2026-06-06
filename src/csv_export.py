@@ -6,7 +6,7 @@ from pathlib import Path
 
 from .config import CSV_COLUMNS
 from .xml_parser import (
-    attr_any, find_mzm_modulators,
+    attr_any, die_coordinates, find_mzm_modulators,
     parse_float_list, nearest_value,
 )
 from .vpi_analysis import extract_modulation_efficiency
@@ -19,8 +19,7 @@ def summarize_xml(xml_path: Path) -> list[dict[str, object]]:
     lot = attr_any(test_site_info, "Batch")
     wafer = attr_any(test_site_info, "Wafer")
     test_site = attr_any(test_site_info, "TestSite")
-    die_column = attr_any(test_site_info, "DieColumn", "Diecolumn")
-    die_row = attr_any(test_site_info, "DieRow", "Dierow")
+    die_column, die_row = die_coordinates(xml_path, test_site_info)
     timestamp = xml_path.parent.name
 
     rows: list[dict[str, object]] = []

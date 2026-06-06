@@ -12,7 +12,7 @@ from scipy.optimize import curve_fit
 from . import config
 from .config import DATA_DIR, CSV_DIR, MOD_BIAS
 from .xml_parser import (
-    attr_any, r2_score, load_xml, pick_sweep, sweep_label,
+    attr_any, die_coordinates, r2_score, load_xml, pick_sweep, sweep_label,
 )
 from .spectrum import (
     mzi_model, measure_fsr, flatten_to_envelope, device_fsr_fallback,
@@ -387,7 +387,8 @@ def analyze_figure(xml_path: Path, out_path: Path) -> bool:
     batch = attr_any(test_site_info, "Batch", default="?")
     wafer = attr_any(test_site_info, "Wafer", default="?")
     device = attr_any(test_site_info, "TestSite", default="?")
-    die = f"({attr_any(test_site_info, 'DieColumn', default='?')},{attr_any(test_site_info, 'DieRow', default='?')})"
+    die_column, die_row = die_coordinates(xml_path, test_site_info)
+    die = f"({die_column},{die_row})"
     title = f"Analysis for {wafer} {die} {device}"
     fig.suptitle(title, fontsize=16, y=0.98, fontweight="bold")
     sub = f"Batch: {batch}  |  Wafer: {wafer}  |  Date: {root.attrib.get('CreationDate', '?')}"
