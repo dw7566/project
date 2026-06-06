@@ -39,6 +39,7 @@ def summarize_xml(xml_path: Path) -> list[dict[str, object]]:
             port_combo.findtext("./IVMeasurement/Current") if port_combo is not None else None
         )
 
+        current_minus_2v = nearest_value(voltage, current, -2.0)
         current_minus_1v = nearest_value(voltage, current, -1.0)
         current_0v = nearest_value(voltage, current, 0.0)
         current_plus_1v = nearest_value(voltage, current, 1.0)
@@ -64,6 +65,7 @@ def summarize_xml(xml_path: Path) -> list[dict[str, object]]:
                     "die_column": die_column, "die_row": die_row,
                     "timestamp": timestamp, "device_name": device_name,
                     "dc_bias_v": sweep.get("DCBias", ""),
+                    "current_at_minus_2v_a": current_minus_2v,
                     "current_at_minus_1v_a": current_minus_1v,
                     "current_at_0v_a": current_0v,
                     "current_at_plus_1v_a": current_plus_1v,
