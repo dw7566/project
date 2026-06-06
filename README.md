@@ -33,7 +33,7 @@ The goal is to process wafer-scale XML measurement data, extract MZM-related dev
 #### - Main Features
 - **Parsing**: Extract wavelength sweep, insertion loss, voltage, and current data from MZM XML files
 - **Fitting**: Perform optical spectrum normalization, MZM parameter fitting via FSR detection, and R² quality metrics
-- **Visualization**: Generate die-level 12-panel analysis figures and wafer-level extinction ratio + bias analysis heatmaps
+- **Visualization**: Generate die-level 9-panel analysis figures and wafer-level extinction ratio + bias analysis heatmaps
 - **CSV Output**: Organize and save measurement data and fitting parameters with wafer/device/timestamp hierarchy
 
 #### - Contributors
@@ -134,6 +134,11 @@ python run.py
   + Analyzes Vπ variation across different wavelengths and measurement conditions
   + Provides statistical summary (mean, min, max)
 
+* **Modulation Efficiency module** (`src/modulation_efficiency.py`)
+  + Fits transmission spectra in dB scale using residual MZI model
+  + Performs envelope detection on flattened spectra
+  + Extracts modulation efficiency metrics and FSR from residuals
+
 * **CSV Export module** (`src/csv_export.py`)
   + Summarizes key parameters from each XML file into a structured row
   + Consolidates multi-file results into wafer-level CSV tables
@@ -149,6 +154,10 @@ python run.py
   + Iterates over all LMZ XML files in the data directory
   + Calls all analysis and visualization routines
   + Manages result organization and file naming
+
+* **CSV Utilities module** (`src/tocsv.py`)
+  + Provides helper functions for CSV file operations
+  + Manages column ordering and data validation
 
 ---
 
@@ -169,7 +178,7 @@ python run.py
       - Extinction ratio calculation across bias points
       - Vπ analysis from phase response
       - IV curve analysis
-   5. **Generate Figure**: Create 12-panel PNG with all analysis results
+   5. **Generate Figure**: Create 9-panel (3x3) PNG with all analysis results
    6. **Extract CSV Row**: Summarize key parameters (IL stats, ER, Vπ, R², source file)
 
 * **Aggregation**
@@ -187,7 +196,7 @@ python run.py
 
 ## 6. Output Examples
 
-### Die-Level Analysis Figure (12-panel)
+### Die-Level Analysis Figure (9-panel, 3x3)
 
 ```
 ┌──────────────────────┬──────────────────────┬──────────────────────┐
@@ -198,9 +207,21 @@ python run.py
 │       FSR fit        │       fitting        │                      │
 ├──────────────────────┼──────────────────────┼──────────────────────┤
 │ (2,0) MZM dB         │ (2,1) Vπ Voltage     │ (2,2) Extinction     │
-│       Residual fit   │       curves         │       Ratio          │     │
-├──────────────────────┼──────────────────────┼──────────────────────┤
+│       Residual fit   │       curves         │       Ratio vs Bias  │
+└──────────────────────┴──────────────────────┴──────────────────────┘
 ```
+
+| Panel | Content |
+|-------|---------|
+| (0,0) | Raw transmission spectra for all bias conditions |
+| (0,1) | Reference sweep with 3rd-order polynomial fit + R² |
+| (0,2) | Flattened (processed) spectra after reference normalization |
+| (1,0) | MZI model fit on linear-scale transmission (FSR, R² shown) |
+| (1,1) | Dark current IV in log-log scale |
+| (1,2) | Forward bias Shockley + reverse bias analysis |
+| (2,0) | MZI model fit on dB-scale residuals (FSR detection) |
+| (2,1) | Vπ vs wavelength + statistics |
+| (2,2) | Extinction ratio vs DC bias across measurement points |
 
 ### Wafer-Level Summary Figure
 
@@ -257,13 +278,48 @@ PNG_DIR = Path("res") / "png"
 
 Change the bias voltage used for MZM FSR fitting:
 
+```python
+# src/config.py
+MOD_BIAS = "-1.0"  # Modulation bias in Volts
 ```
+
+### Thermal Voltage Constant
+
+Adjust thermal voltage (affects IV curve fitting):
+
+```python
+# src/config.py
+THERMAL_VOLTAGE = 0.02585  # At room temperature ~25°C
+```
+
+### Output Figure DPI
+
+Modify resolution in `src/main.py`:
+
+```python
+fig.savefig(out_path, dpi=110, bbox_inches="tight")
+```
+
+### Figure Size and Layout
+
+Adjust figure dimensions and spacing in `src/main.py`:
+
+```python
+# Current: 3x3 grid, 18x15 inches
+fig, axes = plt.subplots(3, 3, figsize=(18, 15))
+fig.subplots_adjust(hspace=0.45, wspace=0.3)
+```
+
+---
+
 ## 9. Project Structure
 
+```
 project/
 ├── run.py                      # Execution entry point
+├── requirements.txt            # Python dependencies
+├── README.md                   # This file
 ├── src/
-│   ├── __init__.py
 │   ├── config.py               # Configuration: paths, bias, constants
 │   ├── main.py                 # Main pipeline orchestrator
 │   ├── xml_parser.py           # XML parsing & data extraction
@@ -273,25 +329,24 @@ project/
 │   ├── vpi_analysis.py         # Vπ extraction & analysis
 │   ├── csv_export.py           # CSV row summarization & export
 │   ├── wafermap.py             # Wafer-level heatmap generation
-│   ├── datalocation.py         # Data path utilities
-│   ├── runfile.py              # Run configuration helpers
-│   ├── tocsv.py                # CSV writing utilities
-│   └── example.py              # Example usage
+│   └── tocsv.py                # CSV utilities
+├── doc/
+│   └── project_explanation.ipynb # Jupyter notebook with detailed explanations
 ├── data/                       # Input directory for XML measurement files
 │   └── (organized by wafer_id/timestamp/)
-├── res/                        # Output directory for results
-│   ├── csv/                    # CSV analysis results
-│   │   ├── mzm_all_summary.csv # Global summary
-│   │   └── {wafer_id}/         # Per-wafer CSVs
-│   │       └── {timestamp}.csv
-│   └── png/                    # Generated analysis figures
-│       └── {wafer_id}/
-│           └── {timestamp}/
-│               ├── *.png       # Die-level analysis figures
-│               └── wafermap.png # Wafer summary heatmap
-├── requirements.txt            # Python dependencies
-└── README.md                   # This file
+└── res/                        # Output directory for results
+    ├── csv/                    # CSV analysis results
+    │   ├── mzm_all_summary.csv # Global summary
+    │   └── {wafer_id}/         # Per-wafer CSVs
+    │       └── {timestamp}.csv
+    └── png/                    # Generated analysis figures
+        └── {wafer_id}/
+            └── {timestamp}/
+                ├── *.png       # Die-level analysis figures (3x3 panels)
+                └── wafermap.png # Wafer summary heatmap
+```
 
+---
 
 ## Requirements
 
@@ -306,10 +361,16 @@ See `requirements.txt` for pinned versions.
 
 ---
 
+## Documentation
+
+For a detailed walkthrough and explanation of the project, see `doc/project_explanation.ipynb` (Jupyter Notebook).
+
+---
+
 ## License
 
 This project is developed by the Silicon Photonics Research Team at Hanyang University.
 
 ---
 
-**Last Updated**: 2026-06-04
+**Last Updated**: 2026-06-06
