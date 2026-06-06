@@ -270,7 +270,7 @@ def analyze_figure(xml_path: Path, out_path: Path) -> bool:
     poly_func = np.poly1d(np.polyfit(ref_l, ref_il, 3))
     fsr_fallback = device_fsr_fallback(root)
 
-    fig, axes = plt.subplots(4, 3, figsize=(20, 20))
+    fig, axes = plt.subplots(3, 3, figsize=(18, 15))
     fig.subplots_adjust(hspace=0.45, wspace=0.3)
 
     # Row 0, Col 0
@@ -377,15 +377,10 @@ def analyze_figure(xml_path: Path, out_path: Path) -> bool:
     plot_iv_log(axes[1][1], iv)
     plot_iv_analysis(axes[1][2], iv)
 
-    # Row 2: dB residual MZM fit and V_pi curves; omit mean-V_pi panel.
+    # Row 2: dB residual MZM fit and V_pi curves
     plot_mzm_db_residual_fit(axes[2][0], sweeps, poly_func, fsr_fallback)
     plot_vpi_voltage_panels([axes[2][1]], root)
-    axes[2][2].set_axis_off()
-
-    # Row 3: keep only ER vs DC bias; omit fringe-position panel.
-    plot_extinction_ratio_panels([axes[3][0]], root)
-    axes[3][1].set_axis_off()
-    axes[3][2].set_axis_off()
+    plot_extinction_ratio_panels([axes[2][2]], root)
 
     # 타이틀
     test_site_info = root.find(".//TestSiteInfo")
