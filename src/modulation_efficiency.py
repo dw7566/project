@@ -10,6 +10,10 @@ from .xml_parser import (
 )
 
 
+MIN_VPI_TRACK_R2 = 0.5
+MIN_ABS_D_LAMBDA_DV_NM_PER_V = 0.02
+
+
 def estimate_modulation_fsr(wavelength: np.ndarray, il: np.ndarray) -> float:
     band_mask = (wavelength >= 1535.0) & (wavelength <= 1575.0)
     if np.count_nonzero(band_mask) < 3:
@@ -106,12 +110,32 @@ def vpi_values_from_analysis(analysis: dict[str, object]) -> list[float]:
     if not np.isfinite(fsr) or fsr <= 0.0:
         return []
 
-    vpi_values = []
-    for track in analysis.get("track_results", []):
-        dlambda_dv = float(track.get("dlambda_dv", float("nan")))
-        if np.isfinite(dlambda_dv) and dlambda_dv != 0.0:
-            vpi_values.append(fsr / (2.0 * abs(dlambda_dv)))
-    return vpi_values
+    return [
+        vpi
+        for track in analysis.get("track_results", [])
+        if (vpi := vpi_value_for_track(track, fsr)) is not None
+    ]
+
+
+def valid_vpi_track(track: dict[str, object]) -> bool:
+    try:
+        dlambda_dv = abs(float(track.get("dlambda_dv", float("nan"))))
+        r2 = float(track.get("r2", float("nan")))
+    except (TypeError, ValueError):
+        return False
+    return (
+        np.isfinite(dlambda_dv)
+        and np.isfinite(r2)
+        and dlambda_dv >= MIN_ABS_D_LAMBDA_DV_NM_PER_V
+        and r2 >= MIN_VPI_TRACK_R2
+    )
+
+
+def vpi_value_for_track(track: dict[str, object], fsr: float) -> float | None:
+    if not np.isfinite(fsr) or fsr <= 0.0 or not valid_vpi_track(track):
+        return None
+    dlambda_dv = abs(float(track["dlambda_dv"]))
+    return fsr / (2.0 * dlambda_dv)
 
 
 def extract_modulation_efficiency(modulator: ET.Element) -> dict[str, object]:
@@ -223,7 +247,8 @@ def plot_modulation_efficiency_panels(axes, root: ET.Element) -> None:
         ])
     summary.extend(["", "Per null:"])
     for index, track in enumerate(track_results):
-        vpi_text = _fmt(vpi_values[index], ".3f") if index < len(vpi_values) else "n/a"
+        vpi = vpi_value_for_track(track, float(analysis["fsr_nm"]))
+        vpi_text = _fmt(vpi, ".3f") if vpi is not None else "n/a"
         summary.append(
             f"@{float(track['wl_0v']):7.2f} nm  "
             f"{float(track['dlambda_dv']): .4f} nm/V  "

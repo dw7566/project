@@ -6,7 +6,11 @@ import xml.etree.ElementTree as ET
 
 import numpy as np
 
-from .modulation_efficiency import analyze_modulation_efficiency
+from .modulation_efficiency import (
+    MIN_ABS_D_LAMBDA_DV_NM_PER_V,
+    analyze_modulation_efficiency,
+    valid_vpi_track,
+)
 from .xml_parser import attr_any, find_mzm_modulators, parse_float_list
 
 
@@ -96,6 +100,9 @@ def fitted_vpi_voltage_curves(modulator: ET.Element) -> tuple[list[dict[str, obj
 
     curves: list[dict[str, object]] = []
     for track in analysis.get("track_results", []):
+        if not valid_vpi_track(track):
+            continue
+
         voltage = np.asarray(track["v"], dtype=float)
         wavelength = np.asarray(track["wl"], dtype=float)
         if voltage.size < 2:
@@ -118,7 +125,12 @@ def fitted_vpi_voltage_curves(modulator: ET.Element) -> tuple[list[dict[str, obj
         with np.errstate(divide="ignore", invalid="ignore"):
             vpi = fsr / (2.0 * np.abs(dlambda_dv))
 
-        keep = np.isfinite(voltage) & np.isfinite(vpi) & (vpi > 0.0)
+        keep = (
+            np.isfinite(voltage)
+            & np.isfinite(vpi)
+            & (vpi > 0.0)
+            & (np.abs(dlambda_dv) >= MIN_ABS_D_LAMBDA_DV_NM_PER_V)
+        )
         if np.count_nonzero(keep) < 2:
             continue
 
