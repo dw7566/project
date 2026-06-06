@@ -134,11 +134,6 @@ python run.py
   + Analyzes Vπ variation across different wavelengths and measurement conditions
   + Provides statistical summary (mean, min, max)
 
-* **Modulation Efficiency module** (`src/modulation_efficiency.py`)
-  + Fits transmission spectra in dB scale using residual MZI model
-  + Performs envelope detection on flattened spectra
-  + Extracts modulation efficiency metrics and FSR from residuals
-
 * **CSV Export module** (`src/csv_export.py`)
   + Summarizes key parameters from each XML file into a structured row
   + Consolidates multi-file results into wafer-level CSV tables
@@ -276,7 +271,6 @@ project/
 │   ├── iv_analysis.py          # IV curve plotting & analysis
 │   ├── extinction_ratio.py     # Extinction ratio calculation
 │   ├── vpi_analysis.py         # Vπ extraction & analysis
-│   ├── modulation_efficiency.py # Modulation fitting in dB scale
 │   ├── csv_export.py           # CSV row summarization & export
 │   ├── wafermap.py             # Wafer-level heatmap generation
 │   ├── datalocation.py         # Data path utilities

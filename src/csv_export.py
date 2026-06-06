@@ -10,7 +10,7 @@ from .xml_parser import (
     attr_any, find_mzm_modulators,
     parse_float_list, nearest_value,
 )
-from .modulation_efficiency import extract_modulation_efficiency
+from .vpi_analysis import extract_modulation_efficiency
 
 
 def summarize_xml(xml_path: Path) -> list[dict[str, object]]:
