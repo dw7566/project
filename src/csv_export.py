@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import csv
-import statistics
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
@@ -70,8 +69,6 @@ def summarize_xml(xml_path: Path) -> list[dict[str, object]]:
                     "current_at_plus_1v_a": current_plus_1v,
                     "wavelength_start_nm": wavelength[0],
                     "wavelength_stop_nm": wavelength[-1],
-                    "il_min_db": il_min, "il_max_db": il_max,
-                    "il_mean_db": statistics.fmean(il),
                     "extinction_ratio_db": il_max - il_min,
                     "wavelength_at_min_il_nm": wavelength[min_index],
                     "wavelength_at_max_il_nm": wavelength[max_index],

@@ -160,11 +160,7 @@ def extract_modulation_efficiency(modulator: ET.Element) -> dict[str, object]:
         "modulation_mean_dlambda_dv_nm_per_v": "",
         "modulation_dlambda_dv_by_null_nm_per_v": "",
         "modulation_null_wavelengths_0v_nm": "",
-        "modulation_r2_by_null": "",
         "vpi_mean_v": "",
-        "vpi_min_v": "",
-        "vpi_max_v": "",
-        "vpi_by_null_v": "",
     }
 
     analysis = analyze_modulation_efficiency(modulator)
@@ -184,11 +180,7 @@ def extract_modulation_efficiency(modulator: ET.Element) -> dict[str, object]:
         "modulation_null_wavelengths_0v_nm": ";".join(
             f"{item['wl_0v']:.4f}" for item in track_results
         ),
-        "modulation_r2_by_null": ";".join(f"{item['r2']:.6f}" for item in track_results),
         "vpi_mean_v": csv_float(float(np.mean(vpi_values))) if vpi_values else "",
-        "vpi_min_v": csv_float(float(np.min(vpi_values))) if vpi_values else "",
-        "vpi_max_v": csv_float(float(np.max(vpi_values))) if vpi_values else "",
-        "vpi_by_null_v": ";".join(f"{value:.6f}" for value in vpi_values),
     }
 
 
