@@ -25,7 +25,8 @@
 ## 1. Introduction
 
 We aim to develop a Python-based automation pipeline for silicon photonics data analysis.
-Wafer-scale MZM (Mach-Zehnder Modulator) measurement data analysis has been tedious and error-prone when done manually.
+Wafer-scale MZM (Mach-Zehnder Modulator) measurement data analysis has been error-prone when done manually.
+
 This project solves that by automating the entire process.
 
 The goal is to process wafer-scale XML measurement data, extract MZM-related device information, key optical/electrical characteristics, and save comprehensive analysis outputs.
@@ -58,14 +59,9 @@ If you have any questions, please contact us at the following email.
     + Die row & column
     + MZM XML measurement files
     + Optical spectrum (wavelength sweep) and IV characteristics
-    + Reference sweep, Dark/Light curves, and Extinction Ratio
+    + Reference sweep, Extinction Ratio
 
 ####
-+ **Run file description**
-
-   SPDAP scans the `data` directory and extracts XML files whose names include `LMZ`.\
-   Then, it parses wavelength sweep, insertion loss, voltage, and current data, runs fitting/analysis logic, and saves CSV tables and PNG figures under the `res` directory.\
-   The pipeline includes reference fitting, MZM FSR detection, V_pi analysis, and extinction ratio extraction across multiple DC bias points.
 
 ---
 
@@ -120,7 +116,6 @@ python run.py
   + Normalizes transmission using reference sweep polynomial fit
 
 * **IV Analysis module** (`src/iv_analysis.py`)
-  + Plots dark current IV curves in log scale with fitting diagnostics
   + Extracts voltage and current relationships
   + Supports multiple bias conditions
 
@@ -133,11 +128,6 @@ python run.py
   + Extracts half-wave voltage (Vπ) from phase/modulation characteristics
   + Analyzes Vπ variation across different wavelengths and measurement conditions
   + Provides statistical summary (mean, min, max)
-
-* **Modulation Efficiency module** (`src/modulation_efficiency.py`)
-  + Fits transmission spectra in dB scale using residual MZI model
-  + Performs envelope detection on flattened spectra
-  + Extracts modulation efficiency metrics and FSR from residuals
 
 * **CSV Export module** (`src/csv_export.py`)
   + Summarizes key parameters from each XML file into a structured row
@@ -161,40 +151,7 @@ python run.py
 
 ---
 
-## 5. Run file algorithm
-
-* **Preparation**
-   + Scan `data/` directory for XML files matching `*LMZ*.xml` pattern
-   + Create result directory hierarchy mirroring data structure
-
-* **Execution (Per XML File)**
-   1. **Parse XML**: Load metadata, sweeps (by DC bias), and IV data
-   2. **Reference Fit**: Fit reference sweep with 3rd-order polynomial
-   3. **Spectrum Processing**: 
-      - Flatten each biased sweep using reference and FSR detection
-      - Extract transmission in both linear and dB scales
-   4. **Parameter Extraction**:
-      - MZM FSR fitting in dB scale with residual envelope
-      - Extinction ratio calculation across bias points
-      - Vπ analysis from phase response
-      - IV curve analysis
-   5. **Generate Figure**: Create 9-panel (3x3) PNG with all analysis results
-   6. **Extract CSV Row**: Summarize key parameters (IL stats, ER, Vπ, R², source file)
-
-* **Aggregation**
-   + Collect all CSV rows from individual files
-   + Write wafer-level CSV: `res/csv/{wafer_id}/{timestamp}.csv`
-   + Write global CSV: `res/csv/mzm_all_summary.csv`
-   + Generate wafer summary figures: extinction ratio by die + by bias heatmaps
-
-* **Output**
-   + Analysis figures: `res/png/{wafer_id}/{timestamp}/*.png`
-   + Wafer map: `res/png/{wafer_id}/{timestamp}/wafermap.png`
-   + CSV data: `res/csv/mzm_all_summary.csv` + `res/csv/{wafer_id}/{timestamp}.csv`
-
----
-
-## 6. Output Examples
+## 5. Output Examples
 
 ### Die-Level Analysis Figure (9-panel, 3x3)
 
@@ -223,15 +180,9 @@ python run.py
 | (2,1) | Vπ vs wavelength + statistics |
 | (2,2) | Extinction ratio vs DC bias across measurement points |
 
-### Wafer-Level Summary Figure
-
-Two panels:
-- **Left**: Die position (col, row) heatmap of best extinction ratio by die
-- **Right**: Extinction ratio vs DC bias (mean ± range)
-
 ---
 
-## 7. CSV Column Description
+## 6. CSV Column Description
 
 | Column Name | Unit | Description |
 |-------------|------|-------------|
@@ -261,7 +212,7 @@ Two panels:
 
 ---
 
-## 8. Configuration
+## 7. Configuration
 
 ### Modify Data Directory
 
@@ -312,7 +263,7 @@ fig.subplots_adjust(hspace=0.45, wspace=0.3)
 
 ---
 
-## 9. Project Structure
+## 8. Project Structure
 
 ```
 project/
