@@ -45,10 +45,6 @@ def summarize_xml(xml_path: Path) -> list[dict[str, object]]:
             port_combo.findtext("./IVMeasurement/Current") if port_combo is not None else None
         )
 
-        current_minus_2v = nearest_value(voltage, current, -2.0)
-        current_minus_1v = nearest_value(voltage, current, -1.0)
-        current_0v = nearest_value(voltage, current, 0.0)
-        current_plus_1v = nearest_value(voltage, current, 1.0)
         modulation = extract_modulation_efficiency(modulator)
         vpi_by_bias = vpi_by_bias_from_modulator(modulator)
 
@@ -58,6 +54,13 @@ def summarize_xml(xml_path: Path) -> list[dict[str, object]]:
             il = parse_float_list(sweep.findtext("./IL"))
             if not wavelength or not il:
                 continue
+
+            # 해당 DC bias에서의 전류
+            try:
+                bias_float = float(dc_bias)
+            except (TypeError, ValueError):
+                bias_float = 0.0
+            current_at_bias = nearest_value(voltage, current, bias_float)
 
             count = min(len(wavelength), len(il))
             wavelength = wavelength[:count]
@@ -73,10 +76,7 @@ def summarize_xml(xml_path: Path) -> list[dict[str, object]]:
                     "die_column": die_column, "die_row": die_row,
                     "timestamp": timestamp, "device_name": device_name,
                     "dc_bias_v": dc_bias,
-                    "current_at_minus_2v_a": current_minus_2v,
-                    "current_at_minus_1v_a": current_minus_1v,
-                    "current_at_0v_a": current_0v,
-                    "current_at_plus_1v_a": current_plus_1v,
+                    "current_a": current_at_bias,
                     "wavelength_start_nm": wavelength[0],
                     "wavelength_stop_nm": wavelength[-1],
                     "extinction_ratio_db": il_max - il_min,
