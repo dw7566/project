@@ -155,16 +155,8 @@ python run.py
 ### Die-Level Analysis Figure (9-panel, 3x3)
 
 ```
-┌──────────────────────┬──────────────────────┬──────────────────────┐
-│ (0,0) Transmission   │ (0,1) Reference Fit  │ (0,2) Flattened      │
-│       as measured    │       (3rd order)    │       spectra        │
-├──────────────────────┼──────────────────────┼──────────────────────┤
-│ (1,0) MZM Linear     │ (1,1) IV Log scale   │ (1,2) IV Analysis    │
-│       FSR fit        │       fitting        │                      │
-├──────────────────────┼──────────────────────┼──────────────────────┤
-│ (2,0) MZM dB         │ (2,1) Vπ Voltage     │ (2,2) Extinction     │
-│       Residual fit   │       curves         │       Ratio vs Bias  │
-└──────────────────────┴──────────────────────┴──────────────────────┘
+<img width="937" height="873" alt="image" src="https://github.com/user-attachments/assets/713eb442-ca66-46d6-888f-f134825e9806" />
+
 ```
 
 | Panel | Content |
