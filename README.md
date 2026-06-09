@@ -250,6 +250,7 @@ project/
 ├── run.py                      # Execution entry point
 ├── requirements.txt            # Python dependencies
 ├── README.md                   # This file
+├── project_explanation.ipynb   # Jupyter notebook with detailed explanations
 ├── src/
 │   ├── config.py               # Configuration: paths, bias, constants
 │   ├── main.py                 # Main pipeline orchestrator
@@ -261,8 +262,7 @@ project/
 │   ├── csv_export.py           # CSV row summarization & export
 │   ├── wafermap.py             # Wafer-level heatmap generation
 │   └── tocsv.py                # CSV utilities
-├── doc/
-│   └── project_explanation.ipynb # Jupyter notebook with detailed explanations
+│
 ├── data/                       # Input directory for XML measurement files
 │   └── (organized by wafer_id/timestamp/)
 └── res/                        # Output directory for results
