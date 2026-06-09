@@ -155,17 +155,6 @@ python run.py
 ### Die-Level Analysis Figure (9-panel, 3x3)
 
 ```
-┌──────────────────────┬──────────────────────┬──────────────────────┐
-│ (0,0) Transmission   │ (0,1) Reference Fit  │ (0,2) Flattened      │
-│       as measured    │       (3rd order)    │       spectra        │
-├──────────────────────┼──────────────────────┼──────────────────────┤
-│ (1,0) MZM Linear     │ (1,1) IV Log scale   │ (1,2) IV Analysis    │
-│       FSR fit        │       fitting        │                      │
-├──────────────────────┼──────────────────────┼──────────────────────┤
-│ (2,0) MZM dB         │ (2,1) Vπ Voltage     │ (2,2) Extinction     │
-│       Residual fit   │       curves         │       Ratio vs Bias  │
-└──────────────────────┴──────────────────────┴──────────────────────┘
-```
 
 | Panel | Content |
 |-------|---------|
@@ -183,22 +172,20 @@ python run.py
 
 ## 6. CSV Column Description
 
-| Column Name | Unit | Description |
-|-------------|------|-------------|
-| `lot` | — | Lot ID from XML |
-| `wafer` | — | Wafer ID (e.g., D08, D24) |
-| `test_site` | — | Test site identifier |
-| `die_column` | — | Die column index |
-| `die_row` | — | Die row index |
-| `timestamp` | — | Measurement timestamp folder name |
-| `device_name` | — | Device descriptor from XML |
-| `dc_bias_v` | V | DC bias voltage applied to MZM |
-| `current_at_minus_1v_a` | A | Current measured at -1V |
-| `current_at_0v_a` | A | Current measured at 0V |
-| `current_at_plus_1v_a` | A | Current measured at +1V |
+| Column Name           | Unit | Description                        |
+|-----------------------|------|------------------------------------|
+| `lot`                 | — | Lot ID from XML                    |
+| `wafer`               | — | Wafer ID (e.g., D08, D24)          |
+| `test_site`           | — | Test site identifier               |
+| `die_column`          | — | Die column index                   |
+| `die_row`             | — | Die row index                      |
+| `timestamp`           | — | Measurement timestamp folder name  |
+| `device_name`         | — | Device descriptor from XML         |
+| `dc_bias_v`           | V | DC bias voltage applied to MZM     |
+| `current_a`           | A | Current measured at DC bias        |
 | `extinction_ratio_db` | dB | Extinction ratio (IL_max - IL_min) |
-| `vpi_mean_v` | V | Mean Vπ across measurement conditions |
-| `source_file` | — | Original XML filename |
+| `vpi_at_dc_bias_v`    | V | Vπ at DC bias                      |
+| `source_file`         | — | Original XML filename              |
 
 ---
 
