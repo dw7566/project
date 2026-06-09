@@ -171,6 +171,8 @@ python run.py
 | (2,1) | Vπ vs wavelength + statistics |
 | (2,2) | Extinction ratio vs DC bias across measurement points |
 
+<img width="1586" height="743" alt="image" src="https://github.com/user-attachments/assets/cf059dff-7e9f-4160-9966-a3551f1a0c39" />
+
 ---
 
 ## 6. CSV Column Description
