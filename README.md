@@ -3,15 +3,14 @@
 ###### Silicon Photonics Data Analysis Automation Pipeline
 ### Contents
 
-[1. Introduction](#1-introduction)\
-[2. Project information](#2-project-information)\
-[3. Install and Run](#3-install-and-run)\
-[4. Description of the module file feature](#4-description-of-the-module-file-feature)\
-[5. Run file algorithm](#5-run-file-algorithm)\
-[6. Output Examples](#6-output-examples)\
-[7. CSV Column Description](#7-csv-column-description)\
-[8. Configuration](#8-configuration)\
-[9. Project Structure](#9-project-structure)
+1. [Introduction](#1-introduction)
+2. [Project Information](#2-project-information)
+3. [Installation and Usage](#3-installation-and-usage)
+4. [Module Descriptions](#4-module-descriptions)
+5. [Output Examples](#5-output-examples)
+6. [CSV Column Definitions](#6-csv-column-definitions)
+7. [Configuration](#7-configuration)
+8. [Project Structure](#8-project-structure)
 
 ---
 
@@ -197,17 +196,8 @@ python run.py
 | `current_at_minus_1v_a` | A | Current measured at -1V |
 | `current_at_0v_a` | A | Current measured at 0V |
 | `current_at_plus_1v_a` | A | Current measured at +1V |
-| `il_min_db` | dB | Minimum insertion loss in sweep |
-| `il_max_db` | dB | Maximum insertion loss in sweep |
-| `il_mean_db` | dB | Mean insertion loss in sweep |
 | `extinction_ratio_db` | dB | Extinction ratio (IL_max - IL_min) |
-| `wavelength_at_min_il_nm` | nm | Wavelength where IL is minimum |
-| `wavelength_at_max_il_nm` | nm | Wavelength where IL is maximum |
-| `modulation_r2_by_null` | — | R² of MZI fit on dB-scale residuals |
 | `vpi_mean_v` | V | Mean Vπ across measurement conditions |
-| `vpi_min_v` | V | Minimum Vπ measured |
-| `vpi_max_v` | V | Maximum Vπ measured |
-| `vpi_by_null_v` | V | Vπ extracted from fringe null method |
 | `source_file` | — | Original XML filename |
 
 ---
