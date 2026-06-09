@@ -157,6 +157,7 @@ python run.py
 <img width="937" height="873" alt="image" src="https://github.com/user-attachments/assets/713eb442-ca66-46d6-888f-f134825e9806" />
 
 ```
+```
 
 | Panel | Content |
 |-------|---------|
