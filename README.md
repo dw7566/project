@@ -5,11 +5,11 @@
 
 1. [Introduction](#1-introduction)
 2. [Project Information](#2-project-information)
-3. [Installation and Usage](#3-installation-and-usage)
-4. [Module Descriptions](#4-module-descriptions)
-5. [Output Examples](#5-output-examples)
-6. [CSV Column Definitions](#6-csv-column-definitions)
-7. [Configuration](#7-configuration)
+3. [Install and Run](#3-install-and-run)
+4. [Configuration](#4-configuration)
+5. [Module Descriptions](#5-description-of-the-module-file-feature)
+6. [Output Examples](#6-output-examples)
+7. [CSV Column Definitions](#7-csv-column-description)
 8. [Project Structure](#8-project-structure)
 
 ---
@@ -100,8 +100,58 @@ python run.py
     - Wafer-level summary figures are saved in `res/png/{wafer_id}/{timestamp}/wafermap.png`
 
 ---
+## 4. Configuration
 
-## 4. Description of the module file feature
+### Modify Data Directory
+
+Edit `src/config.py` to change input/output paths:
+
+```python
+# src/config.py
+DATA_DIR = Path("data")
+CSV_DIR = Path("res") / "csv"
+PNG_DIR = Path("res") / "png"
+```
+
+### Modify Modulation Bias Point
+
+Change the bias voltage used for MZM FSR fitting:
+
+```python
+# src/config.py
+MOD_BIAS = "-1.0"  # Modulation bias in Volts
+```
+
+### Thermal Voltage Constant
+
+Adjust thermal voltage (affects IV curve fitting):
+
+```python
+# src/config.py
+THERMAL_VOLTAGE = 0.02585  # At room temperature ~25°C
+```
+
+### Output Figure DPI
+
+Modify resolution in `src/main.py`:
+
+```python
+fig.savefig(out_path, dpi=110, bbox_inches="tight")
+```
+
+### Figure Size and Layout
+
+Adjust figure dimensions and spacing in `src/main.py`:
+
+```python
+# Current: 3x3 grid, 18x15 inches
+fig, axes = plt.subplots(3, 3, figsize=(18, 15))
+fig.subplots_adjust(hspace=0.45, wspace=0.3)
+```
+
+---
+
+## 5. Description of the module file feature
 
 * **XML Parser module** (`src/xml_parser.py`)
   + Extracts raw wavelength, insertion loss, DC bias, and measurement metadata from XML files
@@ -150,7 +200,7 @@ python run.py
 
 ---
 
-## 5. Output Examples
+## 6. Output Examples
 
 ### Die-Level Analysis Figure (9-panel, 3x3)
 
@@ -175,7 +225,7 @@ python run.py
 
 ---
 
-## 6. CSV Column Description
+## 7. CSV Column Description
 
 | Column Name           | Unit | Description                         |
 |-----------------------|------|-------------------------------------|
@@ -191,57 +241,6 @@ python run.py
 | `extinction_ratio_db` | dB | Extinction ratio (IL_max - IL_min)  |
 | `vpi_at_dc_bias_v`    | V | Vπ at DC bias                       |
 | `source_file`         | — | Original XML filename               |
-
----
-
-## 7. Configuration
-
-### Modify Data Directory
-
-Edit `src/config.py` to change input/output paths:
-
-```python
-# src/config.py
-DATA_DIR = Path("data")
-CSV_DIR = Path("res") / "csv"
-PNG_DIR = Path("res") / "png"
-```
-
-### Modify Modulation Bias Point
-
-Change the bias voltage used for MZM FSR fitting:
-
-```python
-# src/config.py
-MOD_BIAS = "-1.0"  # Modulation bias in Volts
-```
-
-### Thermal Voltage Constant
-
-Adjust thermal voltage (affects IV curve fitting):
-
-```python
-# src/config.py
-THERMAL_VOLTAGE = 0.02585  # At room temperature ~25°C
-```
-
-### Output Figure DPI
-
-Modify resolution in `src/main.py`:
-
-```python
-fig.savefig(out_path, dpi=110, bbox_inches="tight")
-```
-
-### Figure Size and Layout
-
-Adjust figure dimensions and spacing in `src/main.py`:
-
-```python
-# Current: 3x3 grid, 18x15 inches
-fig, axes = plt.subplots(3, 3, figsize=(18, 15))
-fig.subplots_adjust(hspace=0.45, wspace=0.3)
-```
 
 ---
 
