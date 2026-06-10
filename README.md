@@ -83,7 +83,6 @@ project/
 │   ├── vpi_analysis.py         # Vπ extraction & analysis
 │   ├── csv_export.py           # CSV row summarization & export
 │   ├── wafermap.py             # Wafer-level heatmap generation
-│   └── tocsv.py                # CSV utilities
 │
 ├── data/                       # Input directory for XML measurement files
 │   └── (organized by wafer_id/timestamp/)
