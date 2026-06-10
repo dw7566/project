@@ -233,10 +233,6 @@ write_csv(path, rows)
   + Calls all analysis and visualization routines
   + Manages result organization and file naming
 
-* **src/tocsv.py** - `CSV Utilities module`
-  + Provides helper functions for CSV file operations
-  + Manages column ordering and data validation
-
 ---
 
 ## 6. Output Examples
