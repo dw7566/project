@@ -5,11 +5,11 @@
 
 1. [Introduction](#1-introduction)
 2. [Project Information](#2-project-information)
-3. [Installation and Usage](#3-installation-and-usage)
-4. [Module Descriptions](#4-module-descriptions)
-5. [Output Examples](#5-output-examples)
-6. [CSV Column Definitions](#6-csv-column-definitions)
-7. [Configuration](#7-configuration)
+3. [Install and Run](#3-install-and-run)
+4. [Configuration](#4-configuration)
+5. [Module Descriptions](#5-description-of-the-module-file-feature)
+6. [Output Examples](#6-output-examples)
+7. [CSV Column Definitions](#7-csv-column-description)
 8. [Project Structure](#8-project-structure)
 
 ---
@@ -100,101 +100,7 @@ python run.py
     - Wafer-level summary figures are saved in `res/png/{wafer_id}/{timestamp}/wafermap.png`
 
 ---
-
-## 4. Description of the module file feature
-
-* **XML Parser module** (`src/xml_parser.py`)
-  + Extracts raw wavelength, insertion loss, DC bias, and measurement metadata from XML files
-  + Organizes sweep data by bias voltage and identifies reference sweep
-  + Provides utility functions for robust attribute extraction and R² calculation
-
-* **Spectrum Processing module** (`src/spectrum.py`)
-  + Implements MZI model for fitting transmission spectra
-  + Detects Free Spectral Range (FSR) from processed data
-  + Flattens spectral data to envelope for robust peak extraction
-  + Normalizes transmission using reference sweep polynomial fit
-
-* **IV Analysis module** (`src/iv_analysis.py`)
-  + Extracts voltage and current relationships
-  + Supports multiple bias conditions
-
-* **Extinction Ratio module** (`src/extinction_ratio.py`)
-  + Calculates extinction ratio from high and low transmission points
-  + Generates extinction ratio vs DC bias analysis plots
-  + Validates and filters data based on measurement quality
-
-* **Vπ Analysis module** (`src/vpi_analysis.py`)
-  + Extracts half-wave voltage (Vπ) from phase/modulation characteristics
-  + Analyzes Vπ variation across different wavelengths and measurement conditions
-  + Provides statistical summary (mean, min, max)
-
-* **CSV Export module** (`src/csv_export.py`)
-  + Summarizes key parameters from each XML file into a structured row
-  + Consolidates multi-file results into wafer-level CSV tables
-  + Manages timestamp-level organization of CSV outputs
-
-* **Wafer Map module** (`src/wafermap.py`)
-  + Generates 2D heatmaps of die performance metrics (extinction ratio, bias response)
-  + Maps die position (column, row) to measured parameters
-  + Provides visual overview of wafer-scale uniformity
-
-* **Main Pipeline module** (`src/main.py`)
-  + Orchestrates the entire analysis workflow
-  + Iterates over all LMZ XML files in the data directory
-  + Calls all analysis and visualization routines
-  + Manages result organization and file naming
-
-* **CSV Utilities module** (`src/tocsv.py`)
-  + Provides helper functions for CSV file operations
-  + Manages column ordering and data validation
-
----
-
-## 5. Output Examples
-
-### Die-Level Analysis Figure (9-panel, 3x3)
-
-<img width="937" height="873" alt="image" src="https://github.com/user-attachments/assets/713eb442-ca66-46d6-888f-f134825e9806" />
-
-```
-```
-
-| Panel | Content |
-|-------|---------|
-| (0,0) | Raw transmission spectra for all bias conditions |
-| (0,1) | Reference sweep with 3rd-order polynomial fit + R² |
-| (0,2) | Flattened (processed) spectra after reference normalization |
-| (1,0) | MZI model fit on linear-scale transmission (FSR, R² shown) |
-| (1,1) | Dark current IV in log-log scale |
-| (1,2) | Forward bias Shockley + reverse bias analysis |
-| (2,0) | MZI model fit on dB-scale residuals (FSR detection) |
-| (2,1) | Vπ vs wavelength + statistics |
-| (2,2) | Extinction ratio vs DC bias across measurement points |
-
-<img width="1586" height="743" alt="image" src="https://github.com/user-attachments/assets/cf059dff-7e9f-4160-9966-a3551f1a0c39" />
-
----
-
-## 6. CSV Column Description
-
-| Column Name           | Unit | Description                         |
-|-----------------------|------|-------------------------------------|
-| `lot`                 | — | Lot ID from XML                     |
-| `wafer`               | — | Wafer ID (e.g., D08, D24)           |
-| `test_site`           | — | Test site identifier                |
-| `die_column`          | — | Die column index                    |
-| `die_row`             | — | Die row index                       |
-| `timestamp`           | — | Measurement timestamp folder name   |
-| `device_name`         | — | Device descriptor from XML          |
-| `dc_bias_v`           | V | DC bias voltage applied to MZM      |
-| `current_a`           | A | Current measured at DC bias         |
-| `extinction_ratio_db` | dB | Extinction ratio (IL_max - IL_min)  |
-| `vpi_at_dc_bias_v`    | V | Vπ at DC bias                       |
-| `source_file`         | — | Original XML filename               |
-
----
-
-## 7. Configuration
+## 4. Configuration
 
 ### Modify Data Directory
 
@@ -245,6 +151,99 @@ fig.subplots_adjust(hspace=0.45, wspace=0.3)
 
 ---
 
+## 5. Description of the module file feature
+
+* **XML Parser module** (`src/xml_parser.py`)
+  + Extracts raw wavelength, insertion loss, DC bias, and measurement metadata from XML files
+  + Organizes sweep data by bias voltage and identifies reference sweep
+  + Provides utility functions for robust attribute extraction and R² calculation
+
+* **Spectrum Processing module** (`src/spectrum.py`)
+  + Implements MZI model for fitting transmission spectra
+  + Detects Free Spectral Range (FSR) from processed data
+  + Flattens spectral data to envelope for robust peak extraction
+  + Normalizes transmission using reference sweep polynomial fit
+
+* **IV Analysis module** (`src/iv_analysis.py`)
+  + Extracts voltage and current relationships
+  + Supports multiple bias conditions
+
+* **Extinction Ratio module** (`src/extinction_ratio.py`)
+  + Calculates extinction ratio from high and low transmission points
+  + Generates extinction ratio vs DC bias analysis plots
+  + Validates and filters data based on measurement quality
+
+* **Vπ Analysis module** (`src/vpi_analysis.py`)
+  + Extracts half-wave voltage (Vπ) from phase/modulation characteristics
+  + Analyzes Vπ variation across different wavelengths and measurement conditions
+  + Provides statistical summary (mean, min, max)
+
+* **CSV Export module** (`src/csv_export.py`)
+  + Summarizes key parameters from each XML file into a structured row
+  + Consolidates multi-file results into wafer-level CSV tables
+  + Manages timestamp-level organization of CSV outputs
+
+* **Wafer Map module** (`src/wafermap.py`)
+  + Generates 2D heatmaps of die performance metrics (extinction ratio, bias response)
+  + Maps die position (column, row) to measured parameters
+  + Provides visual overview of wafer-scale uniformity
+
+* **Main Pipeline module** (`src/main.py`)
+  + Orchestrates the entire analysis workflow
+  + Iterates over all LMZ XML files in the data directory
+  + Calls all analysis and visualization routines
+  + Manages result organization and file naming
+
+* **CSV Utilities module** (`src/tocsv.py`)
+  + Provides helper functions for CSV file operations
+  + Manages column ordering and data validation
+
+---
+
+## 6. Output Examples
+
+### Die-Level Analysis Figure (9-panel, 3x3)
+
+<img width="937" height="873" alt="image" src="https://github.com/user-attachments/assets/713eb442-ca66-46d6-888f-f134825e9806" />
+
+```
+```
+
+| Panel | Content |
+|-------|---------|
+| (0,0) | Raw transmission spectra for all bias conditions |
+| (0,1) | Reference sweep with 3rd-order polynomial fit + R² |
+| (0,2) | Flattened (processed) spectra after reference normalization |
+| (1,0) | MZI model fit on linear-scale transmission (FSR, R² shown) |
+| (1,1) | Dark current IV in log-log scale |
+| (1,2) | Forward bias Shockley + reverse bias analysis |
+| (2,0) | MZI model fit on dB-scale residuals (FSR detection) |
+| (2,1) | Vπ vs wavelength + statistics |
+| (2,2) | Extinction ratio vs DC bias across measurement points |
+
+<img width="1586" height="743" alt="image" src="https://github.com/user-attachments/assets/cf059dff-7e9f-4160-9966-a3551f1a0c39" />
+
+---
+
+## 7. CSV Column Description
+
+| Column Name           | Unit | Description                         |
+|-----------------------|------|-------------------------------------|
+| `lot`                 | — | Lot ID from XML                     |
+| `wafer`               | — | Wafer ID (e.g., D08, D24)           |
+| `test_site`           | — | Test site identifier                |
+| `die_column`          | — | Die column index                    |
+| `die_row`             | — | Die row index                       |
+| `timestamp`           | — | Measurement timestamp folder name   |
+| `device_name`         | — | Device descriptor from XML          |
+| `dc_bias_v`           | V | DC bias voltage applied to MZM      |
+| `current_a`           | A | Current measured at DC bias         |
+| `extinction_ratio_db` | dB | Extinction ratio (IL_max - IL_min)  |
+| `vpi_at_dc_bias_v`    | V | Vπ at DC bias                       |
+| `source_file`         | — | Original XML filename               |
+
+---
+
 ## 8. Project Structure
 
 ```
@@ -252,6 +251,7 @@ project/
 ├── run.py                      # Execution entry point
 ├── requirements.txt            # Python dependencies
 ├── README.md                   # This file
+├── project_explanation.ipynb   # Jupyter notebook with detailed explanations
 ├── src/
 │   ├── config.py               # Configuration: paths, bias, constants
 │   ├── main.py                 # Main pipeline orchestrator
@@ -263,8 +263,7 @@ project/
 │   ├── csv_export.py           # CSV row summarization & export
 │   ├── wafermap.py             # Wafer-level heatmap generation
 │   └── tocsv.py                # CSV utilities
-├── doc/
-│   └── project_explanation.ipynb # Jupyter notebook with detailed explanations
+│
 ├── data/                       # Input directory for XML measurement files
 │   └── (organized by wafer_id/timestamp/)
 └── res/                        # Output directory for results
