@@ -294,7 +294,8 @@ See `requirements.txt` for pinned versions.
 
 ## Documentation
 
-For a detailed walkthrough and explanation of the project, see `doc/project_explanation.ipynb` (Jupyter Notebook).
+For a detailed walkthrough and explanation of the project, see `project_demo.ipynb`
+(Jupyter Notebook).
 
 ---
 
