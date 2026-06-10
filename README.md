@@ -195,9 +195,9 @@ for mi in minima_idx:
 
 ```
 
-* **modulation_efficiency.py** — `Vπ & dλ/dV extraction`
+* **vpi_analysis.py** — `Vπ & dλ/dV extraction`
   + Tracks deep-null wavelength positions (< −30 dB) across bias sweeps and fits a linear `dλ/dV` slope per null. Vπ is computed from FSR and the fitted slope.
-  + Outputs per-null `dλ/dV`, `Vπ`, and R² via `plot_modulation_efficiency_panels()` and exports them to CSV via `extract_modulation_efficiency()`.
+  + Filters unreliable tracks with R² < 0.5 or |dλ/dV| < 0.02 nm/V to ensure only physically meaningful results are exported.
 ```python
 # Track how each deep null shifts with voltage
 coeffs = np.polyfit(v_arr, wl_arr, 1)   # linear fit: wl = coeffs[0]*V + coeffs[1]
