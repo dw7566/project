@@ -43,7 +43,7 @@ If you have any questions, please contact us at the following email.
 |     Name      |         E-mail          |
 |:-------------:|:-----------------------:|
 | Dong-Min Kim  |  dm1656@hanyang.ac.kr   |
-|  Sang-UK Kim  | tkdlek850@hanyang.ac.kr |
+|  Sang-Uk Kim  | tkdlek850@hanyang.ac.kr |
 | Jae-Hyeok Lee |  dw7566@hanyang.ac.kr   |
 
 ---
