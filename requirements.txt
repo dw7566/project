@@ -12,3 +12,5 @@ python-dateutil
 anytree
 seaborn
 scipy
+jupyter
+ipywidgets
