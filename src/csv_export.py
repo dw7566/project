@@ -1,5 +1,5 @@
 from __future__ import annotations
-
+import pandas as pd
 import csv
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -95,3 +95,7 @@ def write_csv(path: Path, rows: list[dict[str, object]]) -> None:
         writer = csv.DictWriter(csv_file, fieldnames=CSV_COLUMNS, extrasaction="ignore")
         writer.writeheader()
         writer.writerows(rows)
+
+def rows_to_dataframe(rows: list[dict[str, object]]) -> pd.DataFrame:
+    """Return rows in the exact column order used by write_csv()."""
+    return pd.DataFrame(rows).reindex(columns=CSV_COLUMNS)
